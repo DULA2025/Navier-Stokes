@@ -6,8 +6,10 @@
 
 A real-time, interactive 3D Navier-Stokes fluid simulation accelerated with `CUDA.jl`. This project visualizes fluid density fields using a vibrant, professional-style colormap and features an interactive cube obstacle that can be moved within the fluid. The simulation's inflow uses a unique turbulence generation method based on concepts from the E8 exceptional Lie group.
 
-![Simulation Screenshot](https://i.imgur.com/your-screenshot-url.png)
-*(**Note:** Replace the link above with a URL to your own screenshot or GIF of the simulation running! I recommend using [ScreenToGif](https://www.screentogif.com/) to capture a cool animation.)*
+This project is hosted at the [DULA2025/Navier-Stokes](https://github.com/DULA2025/Navier-Stokes) repository.
+
+![Simulation Screenshot](https://raw.githubusercontent.com/DULA2025/Navier-Stokes/main/simulation_screenshot.png)
+*(**Note:** This is a placeholder image. You should upload a screenshot of your simulation named `simulation_screenshot.png` to your GitHub repository for it to display here.)*
 
 ## Features
 
@@ -16,7 +18,7 @@ A real-time, interactive 3D Navier-Stokes fluid simulation accelerated with `CUD
 -   **Interactive Obstacle:** A cube obstacle can be moved with the mouse or keyboard, allowing real-time interaction with the fluid flow.
 -   **Vibrant Visualization:** Uses a multi-color, transparent colormap to visualize fluid density, inspired by professional computational fluid dynamics (CFD) software.
 -   **E8-Based Inflow:** Generates complex inflow conditions using mathematical concepts from the E8 lattice.
--   **Configurable:** Easily change simulation speed, grid size, and obstacle properties directly in the code.
+-   **Cross-platform (Windows & Linux).**
 
 ## Prerequisites
 
@@ -25,48 +27,53 @@ Before you begin, ensure you have the following installed:
 1.  **An NVIDIA GPU:** A CUDA-compatible graphics card is required.
 2.  **NVIDIA CUDA Drivers:** Make sure you have the latest drivers for your GPU installed.
 3.  **Julia:** This project is built on Julia (version 1.7 or newer). You can download it from the [official Julia website](https://julialang.org/downloads/). We recommend installing `juliaup` for easy version management.
-4.  **Git:** Required for cloning the repository. [Download Git](https://git-scm.com/downloads).
 
 ## Installation
 
-### 1. Clone the Repository
+### 1. Download and Unzip the Project
 
-Open a terminal or PowerShell and clone this repository to your local machine.
+First, download the project files.
 
-```bash
-git clone https://github.com/DULA2025/Navier-Stokes/
-cd your-repository-name
-```
+* **Go to this URL:** [**E8_3D_SIM.zip Download Link**](https://github.com/DULA2025/Navier-Stokes/raw/main/E8_3D_SIM.zip)
+* Your browser will download the `E8_3D_SIM.zip` file.
+
+Next, unzip the file.
+
+* **On Windows:** Find the downloaded `.zip` file, right-click it, and select **"Extract All..."**. Choose a location for the project folder.
+* **On Linux:** Open a terminal, navigate to your Downloads folder, and run:
+    ```bash
+    unzip E8_3D_SIM.zip
+    ```
+
+This will create a folder containing all the necessary simulation files (`main_3d.jl`, `install.jl`, etc.).
 
 ### 2. Install Dependencies
 
-The project includes an `install.jl` script to set up the environment and install all required packages.
+Navigate into the newly created project folder using your terminal or PowerShell.
 
 **On Windows (using PowerShell):**
-
 ```powershell
-# Navigate to the project directory
-cd C:\Path\To\Your\Project
+# Navigate into the unzipped project folder
+cd C:\Path\To\Your\E8_3D_SIM
 
 # Run the installation script
 julia install.jl
 ```
 
 **On Linux (using Terminal):**
-
 ```bash
-# Navigate to the project directory
-cd /path/to/your/project
+# Navigate into the unzipped project folder
+cd /path/to/your/E8_3D_SIM
 
 # Run the installation script
 julia install.jl
 ```
 
-This script will activate the local project environment defined by `Project.toml` and install `GLMakie`, `CUDA`, `StaticArrays`, and other dependencies.
+This script will activate the local project environment and install all required Julia packages.
 
 ## Running the Simulation
 
-Once the installation is complete, you can run the simulation using the following command from the project's root directory:
+Once the installation is complete, you can run the simulation using the following command from inside the project's folder:
 
 ```bash
 julia --project=. main_3d.jl
@@ -82,10 +89,10 @@ The `--project=.` flag tells Julia to use the packages defined in the local `Pro
 
 ## Configuration
 
-You can easily tweak the simulation by editing the `main()` function or the `FluidSim3D` constructor in `main_3d.jl`:
+You can easily tweak the simulation by editing `main_3d.jl`:
 
 -   **Simulation Speed:** In the `FluidSim3D` constructor, change the multiplier in `sim_dt = 0.016 * 32.0` to adjust the speed. Higher values are faster but may become unstable.
--   **Grid Size:** In the `main()` function, change the arguments to `DULA_E8.FluidSim3D(64, 64, 64)` to alter the simulation resolution.
+-   **Grid Size:** In the `main()` function, change the arguments to `DULA_E8.FluidSim3D(64, 64, 64)`.
 -   **Obstacle Position & Size:** In the `FluidSim3D` constructor, modify the `obstacle_pos` and `obstacle_radius` variables.
 
 ## License
