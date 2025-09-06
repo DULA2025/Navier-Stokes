@@ -9,7 +9,6 @@ A real-time, interactive 3D Navier-Stokes fluid simulation accelerated with `CUD
 This project is hosted at the [DULA2025/Navier-Stokes](https://github.com/DULA2025/Navier-Stokes) repository.
 
 ![Simulation Screenshot](https://raw.githubusercontent.com/DULA2025/Navier-Stokes/main/simulation_screenshot.png)
-*(**Note:** This is a placeholder image. You should upload a screenshot of your simulation named `simulation_screenshot.png` to your GitHub repository for it to display here.)*
 
 ## Features
 
