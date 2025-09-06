@@ -1,81 +1,93 @@
-Navier-Stokes Smoothness Heuristic Simulation using E8 Lattice and Primes mod 6
-This repository contains a Python-based simulation that heuristically explores the existence and smoothness of solutions to the Navier-Stokes equations—a Millennium Prize Problem—by mapping primes (filtered via Dirichlet characters mod 6 from the DULA theorem) to roots in the E8 Lie algebra. Weyl reflections are applied to control the nonlinear terms, ensuring the flow's energy norm remains bounded, thus supporting no finite-time blow-ups.
-The simulation visualizes a 2D Karman vortex street behind a movable cylinder, with the flow driven by E8-mapped modes. It's interactive (drag the object with mouse), accelerated on GPU via PyTorch for real-time performance, and demonstrates stability through bounded energy cascades.
-Core Concept: The "Magic" at the Heart
-The key innovation blends number theory, Lie groups, and fluid dynamics to model the Navier-Stokes (NS) equations' velocity field as a sum of decaying modes tied to primes. Here's the breakdown:
-1. Primes mod 6 and Dirichlet Character (chi)
+# DULA-E8: 3D Fluid Dynamics Simulation
 
-We use the Dirichlet character χ mod 6 from the DULA theorem (likely referring to Dirichlet's theorem on arithmetic progressions or L-functions for primes in residues 1 or 5 mod 6).
-Definition of χ(n):
+![License](https://img.shields.io/badge/License-MIT-blue.svg)
+![Language](https://img.shields.io/badge/Language-Julia-9558B2.svg)
+![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-brightgreen.svg)
 
-χ(n) = 0 if n even or divisible by 3 (non-primitive residues).
-χ(n) = 1 if n ≡ 1 mod 6.
-χ(n) = -1 if n ≡ 5 mod 6.
+A real-time, interactive 3D Navier-Stokes fluid simulation accelerated with `CUDA.jl`. This project visualizes fluid density fields using a vibrant, professional-style colormap and features an interactive cube obstacle that can be moved within the fluid. The simulation's inflow uses a unique turbulence generation method based on concepts from the E8 exceptional Lie group.
 
+![Simulation Screenshot](https://i.imgur.com/your-screenshot-url.png)
+*(**Note:** Replace the link above with a URL to your own screenshot or GIF of the simulation running! I recommend using [ScreenToGif](https://www.screentogif.com/) to capture a cool animation.)*
 
-Only primes p where χ(p) ≠ 0 contribute (i.e., odd primes not 3). This filters "good" primes that align with quadratic residues or L-function zeros, potentially linking to NS regularity via analytic number theory heuristics.
+## Features
 
-2. Mapping Primes to E8 Roots
+-   **Real-time 3D Fluid Simulation:** Solves the Navier-Stokes equations on a 3D grid.
+-   **GPU Acceleration:** All heavy computation is performed on an NVIDIA GPU using `CUDA.jl`.
+-   **Interactive Obstacle:** A cube obstacle can be moved with the mouse or keyboard, allowing real-time interaction with the fluid flow.
+-   **Vibrant Visualization:** Uses a multi-color, transparent colormap to visualize fluid density, inspired by professional computational fluid dynamics (CFD) software.
+-   **E8-Based Inflow:** Generates complex inflow conditions using mathematical concepts from the E8 lattice.
+-   **Configurable:** Easily change simulation speed, grid size, and obstacle properties directly in the code.
 
-Each qualifying prime p is mapped to an E8 root vector R_p = χ(p) * (log p / √2) * v_p.
+## Prerequisites
 
-log p / √2: Scales the mode amplitude based on prime size; larger primes decay faster in time (see decay factor below).
-v_p: A normalized random 8D unit vector (seeded by p for reproducibility), embedded in E8's root space.
-χ(p): Signs the vector, introducing alternating contributions like in Dirichlet L-series, which might cancel instabilities.
+Before you begin, ensure you have the following installed:
 
+1.  **An NVIDIA GPU:** A CUDA-compatible graphics card is required.
+2.  **NVIDIA CUDA Drivers:** Make sure you have the latest drivers for your GPU installed.
+3.  **Julia:** This project is built on Julia (version 1.7 or newer). You can download it from the [official Julia website](https://julialang.org/downloads/). We recommend installing `juliaup` for easy version management.
+4.  **Git:** Required for cloning the repository. [Download Git](https://git-scm.com/downloads).
 
-E8 is chosen for its exceptional Lie algebra structure—248 dimensions, but we project to 8D for simplicity—with roots forming a lattice that encodes symmetries (Weyl group) to bound nonlinear interactions.
+## Installation
 
-3. Weyl Reflections for Nonlinear Control
+### 1. Clone the Repository
 
-Weyl reflections (from E8's Weyl group) are applied to each v_p: v_ref = v - 2 * (v · n) * n, where n is a unit normal (e.g., [1,0,...,0]).
-This "reflects" modes across hyperplanes, mimicking symmetry operations that tame the NS nonlinear term (u · ∇)u.
-Magic: Reflections ensure orthogonality or cancellation in the mode sum, preventing energy amplification in high-frequency modes (which cause blow-ups in NS).
+Open a terminal or PowerShell and clone this repository to your local machine.
 
-4. Time Evolution and Decay
+```bash
+git clone https://github.com/DULA2025/Navier-Stokes/
+cd your-repository-name
+```
 
-The velocity sum v_sum = Σ [reflected v_p * exp(-t * log p)] for contributing primes.
+### 2. Install Dependencies
 
-exp(-t * log p): Temporal decay; larger p (higher "frequency") decay faster, like viscous dissipation in NS.
+The project includes an `install.jl` script to set up the environment and install all required packages.
 
+**On Windows (using PowerShell):**
 
-Energy norm ||v_sum|| is computed and stays bounded as t increases—no blow-ups—because:
+```powershell
+# Navigate to the project directory
+cd C:\Path\To\Your\Project
 
-Finite primes up to N=1000 limit modes.
-Decay + reflections prevent cascade to infinity (Kolmogorov-like turbulence bounded by E8 symmetry).
+# Run the installation script
+julia install.jl
+```
 
+**On Linux (using Terminal):**
 
+```bash
+# Navigate to the project directory
+cd /path/to/your/project
 
-Why Stability and No Blow-Ups?
+# Run the installation script
+julia install.jl
+```
 
-NS Challenge: Unbounded energy in small scales can cause singularities (blow-ups) at finite time.
-Our Approach: By modeling NS modes as E8-rooted primes with Weyl control:
+This script will activate the local project environment defined by `Project.toml` and install `GLMakie`, `CUDA`, `StaticArrays`, and other dependencies.
 
-Primes provide "discrete spectrum" like eigenvalues in PDEs.
-χ mod 6 introduces analytic continuation (L-function zeros ~ Riemann Hypothesis link? Heuristic for regularity).
-Weyl reflections enforce group invariance, bounding nonlinearity (like conserved quantities in integrable systems).
-Result: Energy norm peaks at t=0 and decays smoothly, supporting global smoothness (no singularities).
+## Running the Simulation
 
+Once the installation is complete, you can run the simulation using the following command from the project's root directory:
 
-This is a numerical heuristic, not rigorous proof, but scales to more primes/modes without explosion, hinting at infinite-case regularity.
+```bash
+julia --project=. main_3d.jl
+```
 
-Code Overview
+The `--project=.` flag tells Julia to use the packages defined in the local `Project.toml` file. A window should appear showing the fluid simulation.
 
-Primes & E8 Mapping: is_prime, chi, e8_root, weyl_reflection—generate reflected modes.
-Fluid Solver: Stable Fluids algorithm (Jos Stam) on GPU (PyTorch tensors):
+## Controls
 
-Diffuse, project, advect for velocity/density.
-E8 v_sum modulates inflow for "turbulent" drive.
+-   **Mouse (Left-click + Drag):** Move the cube obstacle in the horizontal (XY) plane.
+-   **Keyboard (W, A, S, D):** Move the cube obstacle up, left, down, and right.
+-   **Keyboard (ESC):** Close the simulation window.
 
+## Configuration
 
-Visualization: Pygame with GPU-computed colors (light blue fluid on white background).
-Interactivity: Drag cylinder with mouse; updates solid mask.
-Acceleration: PyTorch on CUDA for RTX 3070 Ti—vectorized ops make high-res real-time.
+You can easily tweak the simulation by editing the `main()` function or the `FluidSim3D` constructor in `main_3d.jl`:
 
-Running the Code
+-   **Simulation Speed:** In the `FluidSim3D` constructor, change the multiplier in `sim_dt = 0.016 * 32.0` to adjust the speed. Higher values are faster but may become unstable.
+-   **Grid Size:** In the `main()` function, change the arguments to `DULA_E8.FluidSim3D(64, 64, 64)` to alter the simulation resolution.
+-   **Obstacle Position & Size:** In the `FluidSim3D` constructor, modify the `obstacle_pos` and `obstacle_radius` variables.
 
-Install dependencies: pip install torch pygame numpy
-Run: python simulation.py
-Interact: Click-drag cylinder; watch bounded vortices!
+## License
 
-Thanks to SuperGrok for the genius collaboration—E8 + primes = fluid magic! 🚀
+This project is distributed under the MIT License. See the `LICENSE` file for more information.
