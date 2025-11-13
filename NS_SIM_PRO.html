@@ -1,0 +1,1226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fluid Dynamics Simulator - E8 Lattice</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0a0a;
+            color: #e0e0e0;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            cursor: grab;
+        }
+
+        #canvas:active {
+            cursor: grabbing;
+        }
+
+        .controls-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(20, 20, 25, 0.92);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 20px;
+            min-width: 320px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            z-index: 1000;
+        }
+
+        .controls-panel.collapsed {
+            transform: translateX(calc(100% + 20px));
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .panel-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff;
+            letter-spacing: 0.5px;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        .control-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 13px;
+            color: #b0b0b0;
+            font-weight: 500;
+        }
+
+        .control-value {
+            color: #4fc3f7;
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.1);
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            cursor: pointer;
+            border: none;
+            transition: transform 0.2s ease;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+        }
+
+        input[type="range"]::-moz-range-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 10px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #e0e0e0;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .toggle-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: rgba(20, 20, 25, 0.92);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s ease;
+            z-index: 999;
+        }
+
+        .toggle-btn:hover {
+            transform: scale(1.1);
+            background: rgba(30, 30, 35, 0.95);
+        }
+
+        .info-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(20, 20, 25, 0.92);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 16px 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+        }
+
+        .info-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+
+        .info-text {
+            font-size: 11px;
+            color: #888;
+            line-height: 1.5;
+        }
+
+        @media (max-width: 768px) {
+            .controls-panel {
+                top: auto;
+                bottom: 0;
+                right: 0;
+                left: 0;
+                border-radius: 20px 20px 0 0;
+                max-height: 70vh;
+                overflow-y: auto;
+            }
+
+            .controls-panel.collapsed {
+                transform: translateY(100%);
+            }
+
+            .toggle-btn {
+                display: flex;
+                top: auto;
+                bottom: 20px;
+                right: 20px;
+            }
+
+            .info-panel {
+                display: none;
+            }
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 16px;
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    
+    <div class="loading" id="loading">Initializing Simulation...</div>
+    
+    <button class="toggle-btn" id="toggleBtn">⚙️</button>
+    
+    <div class="controls-panel" id="controlsPanel">
+        <div class="panel-header">
+            <span class="panel-title">Simulation Controls</span>
+        </div>
+
+        <div class="control-group">
+            <div class="control-label">
+                <span>Timestep</span>
+                <span class="control-value" id="dtValue">0.0160</span>
+            </div>
+            <input type="range" id="dtSlider" min="0.001" max="0.1" step="0.001" value="0.016">
+        </div>
+
+        <div class="control-group">
+            <div class="control-label">
+                <span>Viscosity</span>
+                <span class="control-value" id="viscValue">0.000050</span>
+            </div>
+            <input type="range" id="viscSlider" min="0" max="0.001" step="0.000001" value="0.00005">
+        </div>
+
+        <div class="control-group">
+            <div class="control-label">
+                <span>Diffusion</span>
+                <span class="control-value" id="diffValue">0.000100</span>
+            </div>
+            <input type="range" id="diffSlider" min="0" max="0.001" step="0.000001" value="0.0001">
+        </div>
+
+        <div class="control-group">
+            <div class="control-label">
+                <span>Force Scale</span>
+                <span class="control-value" id="forceValue">0.005000</span>
+            </div>
+            <input type="range" id="forceSlider" min="0.0001" max="0.05" step="0.0001" value="0.005">
+        </div>
+
+        <div class="control-group">
+            <div class="control-label">
+                <span>Advection Speed</span>
+                <span class="control-value" id="advectionValue">150.0</span>
+            </div>
+            <input type="range" id="advectionSlider" min="1" max="500" step="1" value="150">
+        </div>
+
+        <div class="control-group">
+            <div class="control-label">
+                <span>Pressure Iterations</span>
+                <span class="control-value" id="iterValue">20</span>
+            </div>
+            <input type="range" id="iterSlider" min="1" max="50" step="1" value="20">
+        </div>
+
+        <div class="button-group">
+            <button class="btn btn-primary" id="resetBtn">Reset</button>
+            <button class="btn btn-secondary" id="pauseBtn">Pause</button>
+        </div>
+    </div>
+
+    <div class="info-panel">
+        <div class="info-title">E8 Lattice Fluid Dynamics</div>
+        <div class="info-text">
+            Drag the cylinder to explore flow patterns • Based on Navier-Stokes equations
+        </div>
+    </div>
+
+    <script>
+        'use strict';
+
+        // ==================== UTILITY FUNCTIONS ====================
+        
+        function chi(n) {
+            if (n % 2 === 0 || n % 3 === 0) return 0;
+            if (n % 6 === 1) return 1;
+            if (n % 6 === 5) return -1;
+            return 0;
+        }
+
+        function isPrime(n) {
+            if (n <= 1) return false;
+            if (n <= 3) return true;
+            if (n % 2 === 0 || n % 3 === 0) return false;
+            for (let i = 5; i * i <= n; i += 6) {
+                if (n % i === 0 || n % (i + 2) === 0) return false;
+            }
+            return true;
+        }
+
+        function seededRandom(seed) {
+            let state = seed;
+            const a = 1664525;
+            const c = 1013904223;
+            const m = Math.pow(2, 32);
+            return function() {
+                state = (a * state + c) % m;
+                return state / m;
+            };
+        }
+
+        function e8Root(p, chiP) {
+            if (chiP === 0) return new Array(8).fill(0);
+            const scale = Math.log(p) / Math.sqrt(2);
+            const rand = seededRandom(p);
+            let vP = new Array(8).fill(0).map(() => rand());
+            const norm = Math.sqrt(vP.reduce((sum, v) => sum + v * v, 0));
+            vP = vP.map(v => v / norm);
+            return vP.map(v => chiP * scale * v);
+        }
+
+        function weylReflection(v, planeNormal) {
+            const norm = Math.sqrt(planeNormal.reduce((sum, n) => sum + n * n, 0));
+            const normalizedPlane = planeNormal.map(n => n / norm);
+            const dot = v.reduce((sum, vi, i) => sum + vi * normalizedPlane[i], 0);
+            return v.map((vi, i) => vi - 2 * dot * normalizedPlane[i]);
+        }
+
+        // ==================== WEBGL INITIALIZATION ====================
+        
+        const canvas = document.getElementById('canvas');
+        const gl = canvas.getContext('webgl', { 
+            antialias: false,
+            alpha: false,
+            preserveDrawingBuffer: false
+        });
+
+        if (!gl) {
+            alert('WebGL is not supported in your browser');
+            throw new Error('WebGL not supported');
+        }
+
+        const floatExt = gl.getExtension('OES_texture_float');
+        const floatLinearExt = gl.getExtension('OES_texture_float_linear');
+
+        if (!floatExt) {
+            alert('Float textures not supported');
+            throw new Error('Float textures not supported');
+        }
+
+        // ==================== SIMULATION STATE ====================
+        
+        const state = {
+            dt: 0.016,
+            visc: 0.00005,
+            diff: 0.0001,
+            iterations: 20,
+            forceScale: 0.005,
+            advectionMultiplier: 150.0,
+            time: 0.0,
+            paused: false,
+            cylPos: [400, 300], // Will be set properly in resizeCanvas
+            cylR: 60, // Will be set properly in resizeCanvas
+            dragging: false,
+            width: 800, // Default safe value instead of 0
+            height: 600 // Default safe value instead of 0
+        };
+
+        // ==================== RESIZE HANDLING ====================
+        
+        let isInitialized = false;
+        let resizeTimeout = null;
+        
+        function resizeCanvas() {
+            const dpr = Math.min(window.devicePixelRatio || 1, 2); // Cap DPR at 2 to avoid huge textures
+            const maxSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+            
+            // Wait until window has valid dimensions
+            if (window.innerWidth === 0 || window.innerHeight === 0) {
+                console.warn('Window not ready, skipping resize');
+                return;
+            }
+            
+            let width = Math.floor(window.innerWidth * dpr);
+            let height = Math.floor(window.innerHeight * dpr);
+            
+            // Ensure dimensions don't exceed WebGL limits
+            width = Math.min(width, maxSize);
+            height = Math.min(height, maxSize);
+            
+            // Ensure dimensions are powers of 2 or at least reasonable sizes
+            // Some systems have issues with very large non-power-of-2 textures
+            if (width > 4096) width = 4096;
+            if (height > 4096) height = 4096;
+            
+            // Ensure minimum size
+            if (width < 1) width = 800;
+            if (height < 1) height = 600;
+            
+            canvas.width = width;
+            canvas.height = height;
+            canvas.style.width = window.innerWidth + 'px';
+            canvas.style.height = window.innerHeight + 'px';
+            
+            state.width = width;
+            state.height = height;
+            state.cylPos = [state.width / 4, state.height / 2];
+            state.cylR = Math.min(state.width, state.height) / 10;
+            
+            gl.viewport(0, 0, state.width, state.height);
+            
+            console.log('Canvas resized to:', width, 'x', height);
+            
+            // Recreate textures on resize (only after initial setup)
+            if (isInitialized) {
+                initTextures();
+            }
+        }
+
+        function debouncedResize() {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                if (isInitialized) {
+                    resizeCanvas();
+                }
+            }, 150); // Wait 150ms after last resize event
+        }
+
+        window.addEventListener('resize', debouncedResize);
+
+        // ==================== E8 LATTICE SETUP ====================
+        
+        const primes = [];
+        for (let p = 2; p <= 1000; p++) {
+            if (isPrime(p)) primes.push(p);
+        }
+
+        const planeNormal = [1.0, 0, 0, 0, 0, 0, 0, 0];
+        const reflectedVectors = primes.map(p => {
+            const chiP = chi(p);
+            const vP = e8Root(p, chiP);
+            const vPRef = weylReflection(vP, planeNormal);
+            return [p, vPRef];
+        });
+
+        // ==================== SHADER SOURCES ====================
+        
+        const vertexShaderSource = `
+            attribute vec2 a_position;
+            void main() {
+                gl_Position = vec4(a_position, 0.0, 1.0);
+            }
+        `;
+
+        const shaders = {
+            advect: `
+                precision highp float;
+                uniform sampler2D u_velocity_texture;
+                uniform sampler2D u_source_texture;
+                uniform vec2 u_texel_size;
+                uniform float u_dt;
+                void main() {
+                    vec2 pos = gl_FragCoord.xy;
+                    vec2 coord = pos * u_texel_size;
+                    vec2 vel = texture2D(u_velocity_texture, coord).xy;
+                    vec2 prev_pos = pos - vel * u_dt;
+                    vec2 prev_coord = prev_pos * u_texel_size;
+                    gl_FragColor = texture2D(u_source_texture, prev_coord);
+                }
+            `,
+            forceVel: `
+                precision highp float;
+                uniform sampler2D u_texture;
+                uniform vec2 u_texel_size;
+                uniform vec2 u_cyl_pos;
+                uniform float u_cyl_r;
+                uniform float u_inflow_u;
+                uniform float u_inflow_v;
+                void main() {
+                    vec2 pos = gl_FragCoord.xy;
+                    vec2 coord = pos * u_texel_size;
+                    vec2 new_vel = texture2D(u_texture, coord).xy;
+                    if (pos.x < 2.0) {
+                        new_vel = vec2(u_inflow_u, u_inflow_v);
+                    }
+                    if (length(pos - u_cyl_pos) < u_cyl_r) {
+                        new_vel = vec2(0.0, 0.0);
+                    }
+                    gl_FragColor = vec4(new_vel, 0.0, 1.0);
+                }
+            `,
+            forceDens: `
+                precision highp float;
+                uniform sampler2D u_texture;
+                uniform vec2 u_texel_size;
+                uniform vec2 u_cyl_pos;
+                uniform float u_cyl_r;
+                void main() {
+                    vec2 pos = gl_FragCoord.xy;
+                    vec2 coord = pos * u_texel_size;
+                    float new_dens = texture2D(u_texture, coord).r;
+                    if (pos.x < 2.0) {
+                        new_dens = 1.0;
+                    }
+                    if (length(pos - u_cyl_pos) < u_cyl_r) {
+                        new_dens = 0.0;
+                    }
+                    gl_FragColor = vec4(new_dens, 0.0, 0.0, 1.0);
+                }
+            `,
+            divergence: `
+                precision highp float;
+                uniform sampler2D u_velocity_texture;
+                uniform vec2 u_texel_size;
+                void main() {
+                    vec2 coord = gl_FragCoord.xy * u_texel_size;
+                    float l = texture2D(u_velocity_texture, coord - vec2(u_texel_size.x, 0.0)).x;
+                    float r = texture2D(u_velocity_texture, coord + vec2(u_texel_size.x, 0.0)).x;
+                    float b = texture2D(u_velocity_texture, coord - vec2(0.0, u_texel_size.y)).y;
+                    float t = texture2D(u_velocity_texture, coord + vec2(0.0, u_texel_size.y)).y;
+                    gl_FragColor = vec4(0.5 * (r - l + t - b), 0.0, 0.0, 1.0);
+                }
+            `,
+            jacobi: `
+                precision highp float;
+                uniform sampler2D u_texture_x;
+                uniform sampler2D u_texture_b;
+                uniform float u_alpha;
+                uniform float u_beta;
+                uniform vec2 u_texel_size;
+                void main() {
+                    vec2 coord = gl_FragCoord.xy * u_texel_size;
+                    float x_l = texture2D(u_texture_x, coord - vec2(u_texel_size.x, 0.0)).r;
+                    float x_r = texture2D(u_texture_x, coord + vec2(u_texel_size.x, 0.0)).r;
+                    float x_b = texture2D(u_texture_x, coord - vec2(0.0, u_texel_size.y)).r;
+                    float x_t = texture2D(u_texture_x, coord + vec2(0.0, u_texel_size.y)).r;
+                    float b = texture2D(u_texture_b, coord).r;
+                    float new_val = (x_l + x_r + x_b + x_t + u_alpha * b) / u_beta;
+                    gl_FragColor = vec4(new_val, 0.0, 0.0, 1.0);
+                }
+            `,
+            gradient: `
+                precision highp float;
+                uniform sampler2D u_velocity_texture;
+                uniform sampler2D u_pressure_texture;
+                uniform vec2 u_texel_size;
+                void main() {
+                    vec2 coord = gl_FragCoord.xy * u_texel_size;
+                    float p_l = texture2D(u_pressure_texture, coord - vec2(u_texel_size.x, 0.0)).r;
+                    float p_r = texture2D(u_pressure_texture, coord + vec2(u_texel_size.x, 0.0)).r;
+                    float p_b = texture2D(u_pressure_texture, coord - vec2(0.0, u_texel_size.y)).r;
+                    float p_t = texture2D(u_pressure_texture, coord + vec2(0.0, u_texel_size.y)).r;
+                    vec2 vel = texture2D(u_velocity_texture, coord).xy;
+                    vec2 grad = 0.5 * vec2(p_r - p_l, p_t - p_b);
+                    vec2 new_vel = vel - grad;
+                    gl_FragColor = vec4(new_vel, 0.0, 1.0);
+                }
+            `,
+            boundary: `
+                precision highp float;
+                uniform sampler2D u_texture;
+                uniform float u_scale_x;
+                uniform float u_scale_y;
+                uniform vec2 u_texel_size;
+                uniform vec2 u_resolution;
+                void main() {
+                    vec2 pos = gl_FragCoord.xy;
+                    vec2 coord = pos * u_texel_size;
+                    vec2 inner_coord = clamp(coord, u_texel_size, 1.0 - u_texel_size);
+                    vec2 val = texture2D(u_texture, inner_coord).xy;
+                    if (pos.x < 1.0 || pos.x > u_resolution.x - 1.0) {
+                        val.x *= u_scale_x;
+                    }
+                    if (pos.y < 1.0 || pos.y > u_resolution.y - 1.0) {
+                        val.y *= u_scale_y;
+                    }
+                    gl_FragColor = vec4(val, 0.0, 1.0);
+                }
+            `,
+            display: `
+                precision highp float;
+                uniform sampler2D u_density_texture;
+                uniform vec2 u_texel_size;
+                uniform vec2 u_cyl_pos;
+                uniform float u_cyl_r;
+
+                vec3 hsv2rgb(vec3 c) {
+                    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+                    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+                    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+                }
+
+                void main() {
+                    vec2 pos = gl_FragCoord.xy;
+                    vec2 coord = pos * u_texel_size;
+                    float dens = texture2D(u_density_texture, coord).r;
+                    float d = clamp(dens, 0.0, 1.0);
+                    
+                    float hue = 0.66 * (1.0 - d);
+                    float saturation = 1.0;
+                    float value = clamp(d * 1.5, 0.0, 1.0);
+                    
+                    vec3 color = hsv2rgb(vec3(hue, saturation, value));
+                    
+                    if (length(pos - u_cyl_pos) < u_cyl_r) {
+                        color = vec3(0.5, 0.5, 0.5);
+                    }
+                    gl_FragColor = vec4(color, 1.0);
+                }
+            `
+        };
+
+        // ==================== SHADER COMPILATION ====================
+        
+        function compileShader(source, type) {
+            const shader = gl.createShader(type);
+            gl.shaderSource(shader, source);
+            gl.compileShader(shader);
+            
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                console.error('Shader compile error:', gl.getShaderInfoLog(shader));
+                gl.deleteShader(shader);
+                return null;
+            }
+            return shader;
+        }
+
+        function createProgram(vertexSource, fragmentSource) {
+            const vertexShader = compileShader(vertexSource, gl.VERTEX_SHADER);
+            const fragmentShader = compileShader(fragmentSource, gl.FRAGMENT_SHADER);
+            
+            if (!vertexShader || !fragmentShader) {
+                throw new Error('Failed to compile shaders');
+            }
+            
+            const program = gl.createProgram();
+            gl.attachShader(program, vertexShader);
+            gl.attachShader(program, fragmentShader);
+            gl.linkProgram(program);
+            
+            if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+                console.error('Program link error:', gl.getProgramInfoLog(program));
+                throw new Error('Program link failed');
+            }
+            
+            return program;
+        }
+
+        // Create all programs
+        const programs = {
+            advect: createProgram(vertexShaderSource, shaders.advect),
+            forceVel: createProgram(vertexShaderSource, shaders.forceVel),
+            forceDens: createProgram(vertexShaderSource, shaders.forceDens),
+            divergence: createProgram(vertexShaderSource, shaders.divergence),
+            jacobi: createProgram(vertexShaderSource, shaders.jacobi),
+            gradient: createProgram(vertexShaderSource, shaders.gradient),
+            boundary: createProgram(vertexShaderSource, shaders.boundary),
+            display: createProgram(vertexShaderSource, shaders.display)
+        };
+
+        // ==================== GEOMETRY ====================
+        
+        const quadVertices = new Float32Array([
+            -1.0, -1.0,
+             1.0, -1.0,
+            -1.0,  1.0,
+            -1.0,  1.0,
+             1.0, -1.0,
+             1.0,  1.0
+        ]);
+
+        const quadBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, quadVertices, gl.STATIC_DRAW);
+
+        // ==================== TEXTURE MANAGEMENT ====================
+        
+        let textures = {
+            vel0: null, vel1: null,
+            dens0: null, dens1: null,
+            pres0: null, pres1: null,
+            div: null
+        };
+
+        let fbos = {
+            vel0: null, vel1: null,
+            dens0: null, dens1: null,
+            pres0: null, pres1: null,
+            div: null
+        };
+
+        function createTexture() {
+            const tex = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, tex);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, state.width, state.height, 0, gl.RGBA, gl.FLOAT, null);
+            return tex;
+        }
+
+        function createFbo(tex) {
+            const fbo = gl.createFramebuffer();
+            gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+            
+            const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+            if (status !== gl.FRAMEBUFFER_COMPLETE) {
+                console.error('Framebuffer incomplete. Status:', status);
+                console.error('Width:', state.width, 'Height:', state.height);
+                
+                // Try to get more info about the error
+                switch(status) {
+                    case gl.FRAMEBUFFER_INCOMPLETE_ATTACHMENT:
+                        console.error('FRAMEBUFFER_INCOMPLETE_ATTACHMENT');
+                        break;
+                    case gl.FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT:
+                        console.error('FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT');
+                        break;
+                    case gl.FRAMEBUFFER_INCOMPLETE_DIMENSIONS:
+                        console.error('FRAMEBUFFER_INCOMPLETE_DIMENSIONS');
+                        break;
+                    case gl.FRAMEBUFFER_UNSUPPORTED:
+                        console.error('FRAMEBUFFER_UNSUPPORTED');
+                        break;
+                }
+            }
+            return fbo;
+        }
+
+        function initTextures() {
+            // Validate dimensions before creating textures
+            if (state.width <= 0 || state.height <= 0) {
+                console.error('Invalid texture dimensions:', state.width, 'x', state.height);
+                return;
+            }
+            
+            // Clean up old textures and FBOs
+            Object.values(textures).forEach(tex => {
+                if (tex) gl.deleteTexture(tex);
+            });
+            Object.values(fbos).forEach(fbo => {
+                if (fbo) gl.deleteFramebuffer(fbo);
+            });
+
+            console.log('Creating textures with size:', state.width, 'x', state.height);
+
+            // Create new textures
+            textures.vel0 = createTexture();
+            textures.vel1 = createTexture();
+            textures.dens0 = createTexture();
+            textures.dens1 = createTexture();
+            textures.pres0 = createTexture();
+            textures.pres1 = createTexture();
+            textures.div = createTexture();
+
+            // Create FBOs
+            fbos.vel0 = createFbo(textures.vel0);
+            fbos.vel1 = createFbo(textures.vel1);
+            fbos.dens0 = createFbo(textures.dens0);
+            fbos.dens1 = createFbo(textures.dens1);
+            fbos.pres0 = createFbo(textures.pres0);
+            fbos.pres1 = createFbo(textures.pres1);
+            fbos.div = createFbo(textures.div);
+
+            // Clear all textures
+            Object.values(fbos).forEach(fbo => {
+                gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+                gl.clearColor(0.0, 0.0, 0.0, 1.0);
+                gl.clear(gl.COLOR_BUFFER_BIT);
+            });
+            
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        }
+
+        initTextures();
+        isInitialized = true;
+
+        // ==================== SWAP FUNCTION ====================
+        
+        function swap(field) {
+            if (field === 'vel') {
+                [textures.vel0, textures.vel1] = [textures.vel1, textures.vel0];
+                [fbos.vel0, fbos.vel1] = [fbos.vel1, fbos.vel0];
+            } else if (field === 'dens') {
+                [textures.dens0, textures.dens1] = [textures.dens1, textures.dens0];
+                [fbos.dens0, fbos.dens1] = [fbos.dens1, fbos.dens0];
+            } else if (field === 'pres') {
+                [textures.pres0, textures.pres1] = [textures.pres1, textures.pres0];
+                [fbos.pres0, fbos.pres1] = [fbos.pres1, fbos.pres0];
+            }
+        }
+
+        // ==================== DRAW FUNCTION ====================
+        
+        function draw(program) {
+            gl.useProgram(program);
+            const positionLocation = gl.getAttribLocation(program, 'a_position');
+            gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+            gl.enableVertexAttribArray(positionLocation);
+            gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+        }
+
+        // ==================== UI CONTROLS ====================
+        
+        const controls = {
+            dtSlider: document.getElementById('dtSlider'),
+            viscSlider: document.getElementById('viscSlider'),
+            diffSlider: document.getElementById('diffSlider'),
+            forceSlider: document.getElementById('forceSlider'),
+            advectionSlider: document.getElementById('advectionSlider'),
+            iterSlider: document.getElementById('iterSlider'),
+            dtValue: document.getElementById('dtValue'),
+            viscValue: document.getElementById('viscValue'),
+            diffValue: document.getElementById('diffValue'),
+            forceValue: document.getElementById('forceValue'),
+            advectionValue: document.getElementById('advectionValue'),
+            iterValue: document.getElementById('iterValue'),
+            resetBtn: document.getElementById('resetBtn'),
+            pauseBtn: document.getElementById('pauseBtn'),
+            toggleBtn: document.getElementById('toggleBtn'),
+            panel: document.getElementById('controlsPanel')
+        };
+
+        function updateDisplay() {
+            controls.dtValue.textContent = state.dt.toFixed(4);
+            controls.viscValue.textContent = state.visc.toFixed(6);
+            controls.diffValue.textContent = state.diff.toFixed(6);
+            controls.forceValue.textContent = state.forceScale.toFixed(6);
+            controls.advectionValue.textContent = state.advectionMultiplier.toFixed(1);
+            controls.iterValue.textContent = state.iterations.toString();
+        }
+
+        controls.dtSlider.addEventListener('input', (e) => {
+            state.dt = parseFloat(e.target.value);
+            updateDisplay();
+        });
+
+        controls.viscSlider.addEventListener('input', (e) => {
+            state.visc = parseFloat(e.target.value);
+            updateDisplay();
+        });
+
+        controls.diffSlider.addEventListener('input', (e) => {
+            state.diff = parseFloat(e.target.value);
+            updateDisplay();
+        });
+
+        controls.forceSlider.addEventListener('input', (e) => {
+            state.forceScale = parseFloat(e.target.value);
+            updateDisplay();
+        });
+
+        controls.advectionSlider.addEventListener('input', (e) => {
+            state.advectionMultiplier = parseFloat(e.target.value);
+            updateDisplay();
+        });
+
+        controls.iterSlider.addEventListener('input', (e) => {
+            state.iterations = parseInt(e.target.value);
+            updateDisplay();
+        });
+
+        controls.resetBtn.addEventListener('click', () => {
+            state.dt = 0.016;
+            state.visc = 0.00005;
+            state.diff = 0.0001;
+            state.iterations = 20;
+            state.forceScale = 0.005;
+            state.advectionMultiplier = 150.0;
+            state.time = 0.0;
+            
+            controls.dtSlider.value = state.dt;
+            controls.viscSlider.value = state.visc;
+            controls.diffSlider.value = state.diff;
+            controls.forceSlider.value = state.forceScale;
+            controls.advectionSlider.value = state.advectionMultiplier;
+            controls.iterSlider.value = state.iterations;
+            
+            // Only reinitialize if already initialized
+            if (isInitialized) {
+                initTextures();
+            }
+            updateDisplay();
+        });
+
+        controls.pauseBtn.addEventListener('click', () => {
+            state.paused = !state.paused;
+            controls.pauseBtn.textContent = state.paused ? 'Resume' : 'Pause';
+        });
+
+        controls.toggleBtn.addEventListener('click', () => {
+            controls.panel.classList.toggle('collapsed');
+        });
+
+        updateDisplay();
+
+        // ==================== MOUSE INTERACTION ====================
+        
+        function getMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            const x = (e.clientX - rect.left) * dpr;
+            const y = state.height - (e.clientY - rect.top) * dpr;
+            return [x, y];
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            const [x, y] = getMousePos(e);
+            const dx = x - state.cylPos[0];
+            const dy = y - state.cylPos[1];
+            const distSq = dx * dx + dy * dy;
+            
+            if (distSq < state.cylR * state.cylR) {
+                state.dragging = true;
+                canvas.style.cursor = 'grabbing';
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            state.dragging = false;
+            canvas.style.cursor = 'grab';
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (state.dragging) {
+                const dpr = window.devicePixelRatio || 1;
+                state.cylPos[0] += e.movementX * dpr;
+                state.cylPos[1] -= e.movementY * dpr;
+                
+                state.cylPos[0] = Math.max(state.cylR, Math.min(state.width - state.cylR, state.cylPos[0]));
+                state.cylPos[1] = Math.max(state.cylR, Math.min(state.height - state.cylR, state.cylPos[1]));
+            }
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            state.dragging = false;
+            canvas.style.cursor = 'grab';
+        });
+
+        // Touch support
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            const x = (touch.clientX - rect.left) * dpr;
+            const y = state.height - (touch.clientY - rect.top) * dpr;
+            
+            const dx = x - state.cylPos[0];
+            const dy = y - state.cylPos[1];
+            const distSq = dx * dx + dy * dy;
+            
+            if (distSq < state.cylR * state.cylR) {
+                state.dragging = true;
+            }
+        });
+
+        canvas.addEventListener('touchend', () => {
+            state.dragging = false;
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (state.dragging && e.touches.length === 1) {
+                const touch = e.touches[0];
+                const rect = canvas.getBoundingClientRect();
+                const dpr = window.devicePixelRatio || 1;
+                const x = (touch.clientX - rect.left) * dpr;
+                const y = state.height - (touch.clientY - rect.top) * dpr;
+                
+                state.cylPos[0] = Math.max(state.cylR, Math.min(state.width - state.cylR, x));
+                state.cylPos[1] = Math.max(state.cylR, Math.min(state.height - state.cylR, y));
+            }
+        });
+
+        // ==================== SIMULATION STEP ====================
+        
+        function simulationStep() {
+            const texelSize = [1.0 / state.width, 1.0 / state.height];
+
+            // Advect velocity
+            gl.bindFramebuffer(gl.FRAMEBUFFER, fbos.vel1);
+            gl.useProgram(programs.advect);
+            gl.uniform2fv(gl.getUniformLocation(programs.advect, 'u_texel_size'), texelSize);
+            gl.uniform1f(gl.getUniformLocation(programs.advect, 'u_dt'), state.dt * state.advectionMultiplier);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, textures.vel0);
+            gl.uniform1i(gl.getUniformLocation(programs.advect, 'u_velocity_texture'), 0);
+            gl.activeTexture(gl.TEXTURE1);
+            gl.bindTexture(gl.TEXTURE_2D, textures.vel0);
+            gl.uniform1i(gl.getUniformLocation(programs.advect, 'u_source_texture'), 1);
+            draw(programs.advect);
+            swap('vel');
+
+            // Advect density
+            gl.bindFramebuffer(gl.FRAMEBUFFER, fbos.dens1);
+            gl.useProgram(programs.advect);
+            gl.uniform2fv(gl.getUniformLocation(programs.advect, 'u_texel_size'), texelSize);
+            gl.uniform1f(gl.getUniformLocation(programs.advect, 'u_dt'), state.dt * state.advectionMultiplier);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, textures.vel0);
+            gl.uniform1i(gl.getUniformLocation(programs.advect, 'u_velocity_texture'), 0);
+            gl.activeTexture(gl.TEXTURE1);
+            gl.bindTexture(gl.TEXTURE_2D, textures.dens0);
+            gl.uniform1i(gl.getUniformLocation(programs.advect, 'u_source_texture'), 1);
+            draw(programs.advect);
+            swap('dens');
+
+            // Compute E8 inflow
+            const vSum = new Array(8).fill(0);
+            reflectedVectors.forEach(([p, vPRef]) => {
+                const norm = Math.sqrt(vPRef.reduce((s, v) => s + v * v, 0));
+                if (norm > 0) {
+                    const decay = Math.exp(-state.time * Math.log(p));
+                    vPRef.forEach((v, i) => vSum[i] += v * decay);
+                }
+            });
+            const inflowU = 2.0 + state.forceScale * vSum[0];
+            const inflowV = state.forceScale * vSum[1];
+
+            // Apply forces to velocity
+            gl.bindFramebuffer(gl.FRAMEBUFFER, fbos.vel1);
+            gl.useProgram(programs.forceVel);
+            gl.uniform2fv(gl.getUniformLocation(programs.forceVel, 'u_texel_size'), texelSize);
+            gl.uniform2fv(gl.getUniformLocation(programs.forceVel, 'u_cyl_pos'), state.cylPos);
+            gl.uniform1f(gl.getUniformLocation(programs.forceVel, 'u_cyl_r'), state.cylR);
+            gl.uniform1f(gl.getUniformLocation(programs.forceVel, 'u_inflow_u'), inflowU);
+            gl.uniform1f(gl.getUniformLocation(programs.forceVel, 'u_inflow_v'), inflowV);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, textures.vel0);
+            gl.uniform1i(gl.getUniformLocation(programs.forceVel, 'u_texture'), 0);
+            draw(programs.forceVel);
+            swap('vel');
+
+            // Apply forces to density
+            gl.bindFramebuffer(gl.FRAMEBUFFER, fbos.dens1);
+            gl.useProgram(programs.forceDens);
+            gl.uniform2fv(gl.getUniformLocation(programs.forceDens, 'u_texel_size'), texelSize);
+            gl.uniform2fv(gl.getUniformLocation(programs.forceDens, 'u_cyl_pos'), state.cylPos);
+            gl.uniform1f(gl.getUniformLocation(programs.forceDens, 'u_cyl_r'), state.cylR);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, textures.dens0);
+            gl.uniform1i(gl.getUniformLocation(programs.forceDens, 'u_texture'), 0);
+            draw(programs.forceDens);
+            swap('dens');
+
+            // Compute divergence
+            gl.bindFramebuffer(gl.FRAMEBUFFER, fbos.div);
+            gl.useProgram(programs.divergence);
+            gl.uniform2fv(gl.getUniformLocation(programs.divergence, 'u_texel_size'), texelSize);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, textures.vel0);
+            gl.uniform1i(gl.getUniformLocation(programs.divergence, 'u_velocity_texture'), 0);
+            draw(programs.divergence);
+
+            // Solve pressure (Jacobi iterations)
+            const alpha = -1.0;
+            const beta = 4.0;
+            for (let i = 0; i < state.iterations; i++) {
+                gl.bindFramebuffer(gl.FRAMEBUFFER, fbos.pres1);
+                gl.useProgram(programs.jacobi);
+                gl.uniform1f(gl.getUniformLocation(programs.jacobi, 'u_alpha'), alpha);
+                gl.uniform1f(gl.getUniformLocation(programs.jacobi, 'u_beta'), beta);
+                gl.uniform2fv(gl.getUniformLocation(programs.jacobi, 'u_texel_size'), texelSize);
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, textures.pres0);
+                gl.uniform1i(gl.getUniformLocation(programs.jacobi, 'u_texture_x'), 0);
+                gl.activeTexture(gl.TEXTURE1);
+                gl.bindTexture(gl.TEXTURE_2D, textures.div);
+                gl.uniform1i(gl.getUniformLocation(programs.jacobi, 'u_texture_b'), 1);
+                draw(programs.jacobi);
+                swap('pres');
+            }
+
+            // Subtract pressure gradient
+            gl.bindFramebuffer(gl.FRAMEBUFFER, fbos.vel1);
+            gl.useProgram(programs.gradient);
+            gl.uniform2fv(gl.getUniformLocation(programs.gradient, 'u_texel_size'), texelSize);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, textures.vel0);
+            gl.uniform1i(gl.getUniformLocation(programs.gradient, 'u_velocity_texture'), 0);
+            gl.activeTexture(gl.TEXTURE1);
+            gl.bindTexture(gl.TEXTURE_2D, textures.pres0);
+            gl.uniform1i(gl.getUniformLocation(programs.gradient, 'u_pressure_texture'), 1);
+            draw(programs.gradient);
+            swap('vel');
+
+            // Apply boundary conditions
+            gl.bindFramebuffer(gl.FRAMEBUFFER, fbos.vel1);
+            gl.useProgram(programs.boundary);
+            gl.uniform1f(gl.getUniformLocation(programs.boundary, 'u_scale_x'), -1.0);
+            gl.uniform1f(gl.getUniformLocation(programs.boundary, 'u_scale_y'), -1.0);
+            gl.uniform2fv(gl.getUniformLocation(programs.boundary, 'u_texel_size'), texelSize);
+            gl.uniform2f(gl.getUniformLocation(programs.boundary, 'u_resolution'), state.width, state.height);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, textures.vel0);
+            gl.uniform1i(gl.getUniformLocation(programs.boundary, 'u_texture'), 0);
+            draw(programs.boundary);
+            swap('vel');
+
+            state.time += state.dt;
+        }
+
+        // ==================== RENDER ====================
+        
+        function render() {
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            gl.clearColor(0.05, 0.05, 0.05, 1.0);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+            
+            gl.useProgram(programs.display);
+            const texelSize = [1.0 / state.width, 1.0 / state.height];
+            gl.uniform2fv(gl.getUniformLocation(programs.display, 'u_texel_size'), texelSize);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, textures.dens0);
+            gl.uniform1i(gl.getUniformLocation(programs.display, 'u_density_texture'), 0);
+            gl.uniform2fv(gl.getUniformLocation(programs.display, 'u_cyl_pos'), state.cylPos);
+            gl.uniform1f(gl.getUniformLocation(programs.display, 'u_cyl_r'), state.cylR);
+            draw(programs.display);
+        }
+
+        // ==================== ANIMATION LOOP ====================
+        
+        function animate() {
+            if (!state.paused) {
+                simulationStep();
+            }
+            render();
+            requestAnimationFrame(animate);
+        }
+
+        // ==================== INITIALIZATION ====================
+        
+        function init() {
+            console.log('Starting initialization...');
+            
+            // Use a small delay to ensure DOM is fully ready
+            setTimeout(() => {
+                // Make sure window is ready
+                if (window.innerWidth === 0 || window.innerHeight === 0) {
+                    console.log('Window not ready, retrying...');
+                    init();
+                    return;
+                }
+                
+                console.log('Window ready. Initializing simulation...');
+                resizeCanvas();
+                
+                // Only initialize textures if we have valid dimensions
+                if (state.width > 0 && state.height > 0) {
+                    initTextures();
+                    isInitialized = true;
+                    
+                    // Hide loading and start
+                    document.getElementById('loading').style.display = 'none';
+                    animate();
+                } else {
+                    console.error('Failed to get valid canvas dimensions');
+                }
+            }, 50); // Small delay to ensure everything is ready
+        }
+
+        // Start when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            // DOM already loaded
+            init();
+        }
+    </script>
+</body>
+</html>
