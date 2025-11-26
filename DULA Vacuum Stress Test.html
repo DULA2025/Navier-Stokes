@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>DULA Vacuum Stress Test</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Courier New', monospace; }
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #00ffcc;
+            background: rgba(0, 10, 20, 0.9);
+            padding: 20px;
+            border: 1px solid #00ffcc;
+            border-radius: 5px;
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.2);
+            width: 300px;
+        }
+        h1 { margin: 0 0 10px 0; font-size: 16px; text-transform: uppercase; letter-spacing: 2px; border-bottom: 1px solid #444; padding-bottom: 5px; }
+        .stat { font-size: 12px; margin-bottom: 8px; display: flex; justify-content: space-between; }
+        .val { color: #fff; font-weight: bold; }
+        .slider-container { margin-top: 15px; border-top: 1px solid #444; padding-top: 10px; }
+        input[type=range] { width: 100%; accent-color: #ff0055; }
+        #status-box { 
+            margin-top: 15px; padding: 10px; 
+            background: #000; border: 1px solid #333; 
+            font-size: 10px; color: #0f0; 
+            height: 60px; overflow-y: scroll; 
+        }
+        .warn { color: #ffaa00; }
+        .crit { color: #ff0055; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div id="hud">
+    <h1>DULA Vacuum Stress Test</h1>
+    <div class="stat">PARTICLES: <span class="val">65,000</span></div>
+    <div class="stat">VISCOSITY (M_vac): <span class="val">0.0014399</span></div>
+    <div class="stat">MAX VELOCITY: <span class="val" id="max-vel">0.0</span></div>
+    <div class="stat">SYSTEM STATE: <span class="val" id="sys-state">STABLE</span></div>
+    
+    <div class="slider-container">
+        <label style="font-size:12px; color:#ff0055; font-weight:bold;">ENERGY INJECTION (1x - 100x)</label>
+        <input type="range" id="forceSlider" min="1" max="100" value="1" step="1">
+        <div style="text-align:right; font-size:14px; color:#ff0055; font-weight:bold;" id="slider-val">1x</div>
+    </div>
+
+    <div id="status-box">System Initialized.<br>Vacuum Viscosity Active.<br>Waiting for stress test...</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<script>
+// --- CONFIGURATION ---
+const COUNT = 65000;
+const BOUNDS = 1200;
+const GRID_SIZE = 60; 
+const VISCOSITY = 0.0014399; // The DULA Constant
+let FORCE_MULTIPLIER = 1.0;
+
+// --- SCENE SETUP ---
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x000000, 0.0006);
+
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 4000);
+camera.position.z = 1000;
+camera.position.y = 300;
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// --- GEOMETRY: THE PRIME SIEVE ---
+// Pre-calculating the E8/Leech Lattice forces
+const sieveField = new Float32Array(GRID_SIZE * GRID_SIZE * GRID_SIZE * 3);
+
+function isPrime(num) {
+    if (num <= 1) return false;
+    if (num <= 3) return true;
+    if (num % 2 === 0 || num % 3 === 0) return false;
+    for (let i = 5; i * i <= num; i += 6) {
+        if (num % i === 0 || num % (i + 2) === 0) return false;
+    }
+    return true;
+}
+
+// Generate Sieve
+let nodes = 0;
+for (let x = 0; x < GRID_SIZE; x++) {
+    for (let y = 0; y < GRID_SIZE; y++) {
+        for (let z = 0; z < GRID_SIZE; z++) {
+            const n = Math.abs(x * x + y * y + z * z);
+            const idx = (x + y * GRID_SIZE + z * GRID_SIZE * GRID_SIZE) * 3;
+            
+            // DULA Sieve Logic: Only prime-correlated coordinates have force
+            if (isPrime(n) || isPrime(x*y+z+1)) {
+                const mod6 = n % 6;
+                // Base force vector
+                const mag = 0.05;
+                sieveField[idx]     = (Math.sin(x*0.4) + (mod6===1?1:-1)) * mag;
+                sieveField[idx + 1] = (Math.cos(y*0.4) + (mod6===5?1:-1)) * mag;
+                sieveField[idx + 2] = (Math.sin(z*0.4)) * mag;
+                nodes++;
+            } else {
+                sieveField[idx] = 0; sieveField[idx+1] = 0; sieveField[idx+2] = 0;
+            }
+        }
+    }
+}
+log(`Generated ${nodes} Sieve Nodes.`);
+
+// --- PARTICLES ---
+const geometry = new THREE.BufferGeometry();
+const positions = new Float32Array(COUNT * 3);
+const velocities = new Float32Array(COUNT * 3);
+const colors = new Float32Array(COUNT * 3);
+
+for (let i = 0; i < COUNT; i++) {
+    const i3 = i * 3;
+    positions[i3] = (Math.random() - 0.5) * BOUNDS;
+    positions[i3 + 1] = (Math.random() - 0.5) * BOUNDS;
+    positions[i3 + 2] = (Math.random() - 0.5) * BOUNDS;
+    colors[i3] = 0; colors[i3+1] = 0.5; colors[i3+2] = 1;
+}
+geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+const material = new THREE.PointsMaterial({
+    size: 3.0,
+    vertexColors: true,
+    blending: THREE.AdditiveBlending,
+    transparent: true,
+    opacity: 0.9
+});
+const particles = new THREE.Points(geometry, material);
+scene.add(particles);
+
+// --- LOGGING ---
+function log(msg, type="norm") {
+    const box = document.getElementById('status-box');
+    const span = document.createElement('div');
+    span.innerHTML = `> ${msg}`;
+    if(type==="warn") span.className = "warn";
+    if(type==="crit") span.className = "crit";
+    box.appendChild(span);
+    box.scrollTop = box.scrollHeight;
+}
+
+// --- CONTROLS ---
+const slider = document.getElementById('forceSlider');
+const valDisplay = document.getElementById('slider-val');
+slider.oninput = function() {
+    FORCE_MULTIPLIER = parseInt(this.value);
+    valDisplay.innerText = FORCE_MULTIPLIER + "x";
+    if(FORCE_MULTIPLIER > 50) valDisplay.style.color = "#fff";
+    if(FORCE_MULTIPLIER === 100) log("WARNING: MAXIMUM ENERGY INJECTION", "warn");
+}
+
+// --- PHYSICS LOOP ---
+function update() {
+    const pos = geometry.attributes.position.array;
+    const vel = velocities;
+    const col = geometry.attributes.color.array;
+    
+    const halfB = BOUNDS / 2;
+    const gridScale = GRID_SIZE / BOUNDS;
+    
+    let maxVel = 0;
+    let blownUp = false;
+
+    for (let i = 0; i < COUNT; i++) {
+        const i3 = i * 3;
+        
+        let px = pos[i3];
+        let py = pos[i3 + 1];
+        let pz = pos[i3 + 2];
+
+        // Grid Lookup
+        let gx = Math.floor((px + halfB) * gridScale * GRID_SIZE / BOUNDS * 2);
+        let gy = Math.floor((py + halfB) * gridScale * GRID_SIZE / BOUNDS * 2);
+        let gz = Math.floor((pz + halfB) * gridScale * GRID_SIZE / BOUNDS * 2);
+        
+        gx = (gx + GRID_SIZE) % GRID_SIZE;
+        gy = (gy + GRID_SIZE) % GRID_SIZE;
+        gz = (gz + GRID_SIZE) % GRID_SIZE;
+        
+        const sIdx = (gx + gy * GRID_SIZE + gz * GRID_SIZE * GRID_SIZE) * 3;
+
+        // --- THE DULA EQUATION ---
+        // F_sieve * Multiplier
+        const fx = sieveField[sIdx] * FORCE_MULTIPLIER;
+        const fy = sieveField[sIdx+1] * FORCE_MULTIPLIER;
+        const fz = sieveField[sIdx+2] * FORCE_MULTIPLIER;
+
+        // Apply Force
+        vel[i3]   += fx;
+        vel[i3+1] += fy;
+        vel[i3+2] += fz;
+
+        // Apply Viscosity (M_vac) - The Stabilizer
+        // If this term is sufficient, v will never reach Infinity
+        vel[i3]   *= (1 - VISCOSITY);
+        vel[i3+1] *= (1 - VISCOSITY);
+        vel[i3+2] *= (1 - VISCOSITY);
+
+        // Update Position
+        px += vel[i3];
+        py += vel[i3+1];
+        pz += vel[i3+2];
+
+        // Bounds Wrap
+        if (px > halfB) px -= BOUNDS; else if (px < -halfB) px += BOUNDS;
+        if (py > halfB) py -= BOUNDS; else if (py < -halfB) py += BOUNDS;
+        if (pz > halfB) pz -= BOUNDS; else if (pz < -halfB) pz += BOUNDS;
+
+        pos[i3] = px; pos[i3+1] = py; pos[i3+2] = pz;
+
+        // Crash Detection & Color
+        const vSq = vel[i3]**2 + vel[i3+1]**2 + vel[i3+2]**2;
+        if (vSq > maxVel) maxVel = vSq;
+        if (isNaN(vSq) || !isFinite(vSq)) blownUp = true;
+
+        // Color based on energy
+        const energy = Math.min(vSq * 0.05, 1.0); // Normalize visual
+        col[i3] = energy;       // Red
+        col[i3+1] = 0.5 + energy*0.5; // Green
+        col[i3+2] = 1.0 - energy*0.2; // Blue
+    }
+
+    geometry.attributes.position.needsUpdate = true;
+    geometry.attributes.color.needsUpdate = true;
+
+    // HUD Update
+    document.getElementById('max-vel').innerText = Math.sqrt(maxVel).toFixed(2);
+    
+    if (blownUp) {
+        document.getElementById('sys-state').innerText = "BLOW UP DETECTED!";
+        document.getElementById('sys-state').style.color = "#f00";
+        log("CRITICAL FAILURE: SINGULARITY FORMED", "crit");
+        return; // Stop simulation
+    }
+}
+
+// --- ANIMATION ---
+let time = 0;
+function animate() {
+    requestAnimationFrame(animate);
+    time += 0.005;
+    
+    update();
+    
+    // Rotate Camera
+    const r = 1200;
+    camera.position.x = r * Math.sin(time * 0.3);
+    camera.position.z = r * Math.cos(time * 0.3);
+    camera.lookAt(0,0,0);
+    
+    renderer.render(scene, camera);
+}
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+animate();
+</script>
+</body>
+</html>
