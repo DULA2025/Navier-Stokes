@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DULA Warp Drive: Enterprise - Exact Solution</title>
+<style>
+  body { 
+    margin:0; overflow:hidden; background:#000; 
+    font-family:'Courier New', monospace; 
+  }
+  canvas { display:block; }
+  #ui {
+    position:absolute; top:20px; left:20px; z-index:10;
+    background:rgba(0,0,0,0.95); padding:30px; border-left:8px solid #00ffff;
+    color:#00ffff; max-width:550px; border-radius:12px;
+    box-shadow:0 0 50px rgba(0,255,255,0.3);
+  }
+  .title { 
+    font-size:2.8em; font-weight:900; color:#00ffff; 
+    text-shadow:0 0 30px #00ffff, 0 0 60px #00ffff;
+    letter-spacing:2px;
+  }
+  .subtitle {
+    color:#0f0; margin:15px 0; font-size:1.1em;
+    text-shadow:0 0 10px #0f0;
+  }
+  button {
+    background:#000; border:3px solid #0ff; color:#0ff; padding:15px 35px;
+    font-size:1.5em; margin:12px 8px; cursor:pointer; border-radius:10px;
+    box-shadow:0 0 30px rgba(0,255,255,0.5); transition:0.3s;
+    font-family:'Courier New', monospace; font-weight:bold;
+  }
+  button:hover { background:#0ff; color:#000; transform:scale(1.05); }
+  button:active { transform:scale(0.95); }
+  #status { 
+    margin-top:20px; font-size:1.2em; color:#0f0; 
+    line-height:1.6; text-shadow:0 0 8px #0f0;
+  }
+  #metrics {
+    margin-top:15px; padding:15px; background:rgba(0,50,50,0.3);
+    border-left:3px solid #0f0; font-size:0.95em; color:#0ff;
+    border-radius:5px;
+  }
+  #footer {
+    position:absolute; bottom:20px; width:100%; text-align:center; 
+    color:#0f0; font-size:13px; z-index:5;
+    text-shadow:0 0 10px #0f0; line-height:1.8;
+  }
+  .highlight { color:#f0f; font-weight:bold; text-shadow:0 0 10px #f0f; }
+</style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+
+<div id="ui">
+  <div class="title">DULA WARP DRIVE</div>
+  <div class="subtitle">
+    Class: NCC-1701 Enterprise<br>
+    <span style="font-size:0.9em;">Leech Lattice Λ₂₄ • Prime Superfluid</span>
+  </div>
+  <button id="engage">ENGAGE WARP</button>
+  <button id="ftl">FTL MODE</button>
+  <div id="status">Vacuum stable. Impulse power only.</div>
+  <div id="metrics">
+    σ (viscosity depth): <span id="sigma">0.00</span><br>
+    v_s (coordinate velocity): <span id="velocity">0.0c</span><br>
+    Metric state: <span id="metric">Minkowski</span><br>
+    Energy density T₀₀: <span id="energy">≥ 0</span>
+  </div>
+</div>
+
+<div id="footer">
+  <span class="highlight">28 NOVEMBER 2025</span> — Final Simulation<br>
+  DULA • Gemini-3 • Grok 4 collaboration<br>
+  <strong>The saddle is stable. The ship flies.</strong>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+let width = window.innerWidth;
+let height = window.innerHeight;
+canvas.width = width;
+canvas.height = height;
+
+// --- ENTERPRISE GEOMETRY (3D Points) ---
+function createEnterprise() {
+    // Define points relative to center (0,0,0)
+    // Saucer
+    const s = [];
+    for(let i=0; i<=32; i++) {
+        const a = (i/32) * Math.PI * 2;
+        s.push({x: 40*Math.cos(a), y: 10, z: -30 + 15*Math.sin(a)});
+    }
+    // Bridge
+    const b = [];
+    for(let i=0; i<=16; i++) {
+        const a = (i/16) * Math.PI * 2;
+        b.push({x: 8*Math.cos(a), y: 18, z: -30 + 5*Math.sin(a)});
+    }
+    // Engineering Hull
+    const e = [
+        {x:0, y:-15, z:-10}, {x:0, y:-15, z:50}, // Spine
+        {x:0, y:-15, z:-15}, // Deflector mount
+        {x:5, y:-15, z:50}, {x:-5, y:-15, z:50}, // Taper
+        {x:5, y:-15, z:10}, {x:-5, y:-15, z:10}  // Body
+    ];
+    // Deflector Dish
+    const d = [];
+    for(let i=0; i<=16; i++) {
+        const a = (i/16) * Math.PI * 2;
+        d.push({x: 4*Math.cos(a), y: -15 + 4*Math.sin(a), z: -15});
+    }
+    // Nacelles
+    const nL = [
+        {x:-30, y:25, z:-20}, {x:-30, y:25, z:60}, // Main tube
+        {x:-30, y:25, z:-25} // Bussard cap
+    ];
+    const nR = [
+        {x:30, y:25, z:-20}, {x:30, y:25, z:60},
+        {x:30, y:25, z:-25}
+    ];
+    // Pylons
+    const pL = [{x:0, y:-5, z:20}, {x:-30, y:25, z:20}];
+    const pR = [{x:0, y:-5, z:20}, {x:30, y:25, z:20}];
+    // Neck
+    const neck = [{x:0, y:10, z:-30}, {x:0, y:-10, z:-10}];
+
+    return {s, b, e, d, nL, nR, pL, pR, neck};
+}
+const ship = createEnterprise();
+
+// Particle system for prime superfluid
+const particles = [];
+const numParticles = 3000;
+
+class Particle {
+  constructor() {
+    this.reset();
+  }
+  
+  reset() {
+    const angle = Math.random() * Math.PI * 2;
+    const radius = 100 + Math.random() * 600;
+    this.x = 0; // Will be computed from angle/radius
+    this.y = 0;
+    this.z = Math.random() * 2000 - 1000;
+    this.baseAngle = angle;
+    this.baseRadius = radius;
+    this.hue = 180 + Math.random() * 60;
+    this.size = 1 + Math.random() * 2;
+  }
+}
+
+// Initialize particles
+for (let i = 0; i < numParticles; i++) {
+  particles.push(new Particle());
+}
+
+// Stars (background)
+const stars = [];
+for (let i = 0; i < 400; i++) {
+  stars.push({
+    x: (Math.random() - 0.5) * width * 3,
+    y: (Math.random() - 0.5) * height * 3,
+    z: Math.random() * 2000, // Depth
+    size: Math.random() * 2
+  });
+}
+
+// Warp state
+let warpActive = false;
+let ftlMode = false;
+let sigma = 0;
+let vs = 0;
+let time = 0;
+let camRotX = 0;
+let camRotY = 0;
+
+// Mouse interaction
+let isDragging = false;
+let lastMouseX = 0;
+let lastMouseY = 0;
+canvas.addEventListener('mousedown', e => { isDragging = true; lastMouseX = e.clientX; lastMouseY = e.clientY; });
+window.addEventListener('mouseup', () => isDragging = false);
+canvas.addEventListener('mousemove', e => {
+    if(isDragging) {
+        camRotX += (e.clientX - lastMouseX) * 0.005;
+        camRotY += (e.clientY - lastMouseY) * 0.005;
+        lastMouseX = e.clientX; lastMouseY = e.clientY;
+    }
+});
+
+function bubbleProfile(r) {
+  const width = 120;
+  return 1 / (1 + Math.exp(-(r - 200) / width));
+}
+
+function project(x, y, z) {
+    // Apply Rotation (Orbit)
+    // Y-Axis
+    let x1 = x * Math.cos(camRotX) - z * Math.sin(camRotX);
+    let z1 = x * Math.sin(camRotX) + z * Math.cos(camRotX);
+    // X-Axis
+    let y2 = y * Math.cos(camRotY) - z1 * Math.sin(camRotY);
+    let z2 = y * Math.sin(camRotY) + z1 * Math.cos(camRotY);
+
+    const fov = 400;
+    const scale = fov / (fov + z2 + 400); // Camera distance
+    return {
+        x: width/2 + x1 * scale,
+        y: height/2 + y2 * scale,
+        s: scale,
+        visible: z2 > -300
+    };
+}
+
+function draw() {
+  // Clear
+  ctx.fillStyle = 'rgba(0, 0, 5, 0.5)'; // Trail effect
+  ctx.fillRect(0, 0, width, height);
+  
+  // Draw stars
+  ctx.fillStyle = '#fff';
+  for (const star of stars) {
+    // Relativistic Star Streak
+    star.z -= vs * 5;
+    if(star.z < -500) star.z += 2000;
+    
+    const p = project(star.x, star.y, star.z);
+    if(p.visible) {
+        const len = Math.max(1, vs * p.s * 2);
+        ctx.globalAlpha = 0.5;
+        ctx.fillRect(p.x, p.y, p.s * star.size, p.s * star.size + len);
+    }
+  }
+  ctx.globalAlpha = 1;
+  
+  // Update warp parameters
+  const targetVs = ftlMode ? 20 : (warpActive ? 5 : 0);
+  vs += (targetVs - vs) * 0.05;
+  
+  const targetSigma = warpActive ? 0.9 : 0;
+  sigma += (targetSigma - sigma) * 0.02;
+  
+  time += 0.016;
+  
+  // Draw Prime Lattice (The Fluid)
+  for (const p of particles) {
+    // Rotate particles in world space (The Universe Spin)
+    // p.baseAngle += 0.001;
+    
+    let x = Math.cos(p.baseAngle) * p.baseRadius;
+    let y = Math.sin(p.baseAngle) * p.baseRadius;
+    let z = p.z;
+    
+    // Move past ship
+    z -= vs * 2; 
+    if(z < -1000) z += 2000;
+    p.z = z;
+
+    // Apply Alcubierre Metric Distortion
+    // Bubble centered at (0,0,0) where ship is
+    const r = Math.sqrt(x*x + y*y + z*z);
+    const warp = bubbleProfile(r) * sigma;
+    
+    // Visual Metric Effect:
+    // Front (z < 0): Compress -> Z moves closer to 0
+    // Rear (z > 0): Expand -> Z moves away from 0
+    // Radial: Expand -> Pushed out by bubble
+    
+    if(z < 0) z = z * (1.0 - warp * 0.8);
+    else z = z * (1.0 + warp * 1.5);
+    
+    x = x * (1.0 + warp * 0.5);
+    y = y * (1.0 + warp * 0.5);
+    
+    // Project
+    const proj = project(x, y, z);
+    
+    if (proj.visible) {
+      const size = p.size * proj.s * (1 + warp);
+      
+      // Doppler Color
+      let hue = p.hue;
+      if(warp > 0.1) {
+          if(z < -50) hue = 180 + warp * 60; // Cyan/Blue Shift
+          else if(z > 50) hue = 300 + warp * 60; // Red Shift
+          else hue = 60; // Yellow (Hull/Bubble boundary)
+      }
+      
+      ctx.fillStyle = `hsla(${hue}, 100%, 70%, ${Math.min(1, proj.s)})`;
+      ctx.beginPath();
+      ctx.arc(proj.x, proj.y, size, 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
+  
+  // Draw Enterprise
+  ctx.strokeStyle = '#ccc';
+  ctx.lineWidth = 2;
+  
+  function drawPoly(pts, close=false) {
+      ctx.beginPath();
+      let first = null;
+      for(let i=0; i<pts.length; i++) {
+          const p = project(pts[i].x, pts[i].y, pts[i].z);
+          if(!p.visible) continue;
+          if(i===0) { ctx.moveTo(p.x, p.y); first=p; }
+          else ctx.lineTo(p.x, p.y);
+      }
+      if(close && first) ctx.lineTo(first.x, first.y);
+      ctx.stroke();
+  }
+  
+  // Draw components
+  // Saucer
+  ctx.strokeStyle = '#ddd'; drawPoly(ship.s, true);
+  // Bridge
+  ctx.strokeStyle = '#fff'; drawPoly(ship.b, true);
+  // Eng Hull
+  ctx.strokeStyle = '#bbb';
+  drawPoly([ship.e[0], ship.e[1]]); // Spine
+  drawPoly([ship.e[2], ship.e[3], ship.e[4], ship.e[2]]); // Taper
+  // Dish
+  ctx.strokeStyle = '#ffaa00'; drawPoly(ship.d, true);
+  // Pylons
+  ctx.strokeStyle = '#999';
+  drawPoly([ship.pL[0], ship.pL[1]]);
+  drawPoly([ship.pR[0], ship.pR[1]]);
+  // Neck
+  drawPoly([ship.neck[0], ship.neck[1]]);
+  
+  // Nacelles + Glows
+  ctx.strokeStyle = '#ccc';
+  drawPoly([ship.nL[0], ship.nL[1]]);
+  drawPoly([ship.nR[0], ship.nR[1]]);
+  
+  // Bussard Collectors (Glow)
+  if(warpActive) {
+      const pulsate = 1.0 + Math.sin(time*20)*0.2;
+      ctx.fillStyle = `rgba(255, 50, 0, ${0.8 * pulsate})`;
+      const bL = project(ship.nL[2].x, ship.nL[2].y, ship.nL[2].z);
+      const bR = project(ship.nR[2].x, ship.nR[2].y, ship.nR[2].z);
+      if(bL.visible) { ctx.beginPath(); ctx.arc(bL.x, bL.y, 8*bL.s, 0, Math.PI*2); ctx.fill(); }
+      if(bR.visible) { ctx.beginPath(); ctx.arc(bR.x, bR.y, 8*bR.s, 0, Math.PI*2); ctx.fill(); }
+  }
+  
+  // Warp Bubble Visual
+  if(sigma > 0.1) {
+      ctx.strokeStyle = `rgba(0, 255, 255, ${sigma * 0.3})`;
+      ctx.beginPath();
+      const bProj = project(0,0,0);
+      ctx.arc(bProj.x, bProj.y, 150 * bProj.s, 0, Math.PI*2);
+      ctx.stroke();
+  }
+
+  // Update metrics
+  document.getElementById('sigma').textContent = sigma.toFixed(3);
+  document.getElementById('velocity').textContent = (vs * 0.5).toFixed(2) + 'c';
+  document.getElementById('metric').textContent = warpActive ? 'Alcubierre' : 'Minkowski';
+  document.getElementById('energy').textContent = warpActive ? '≥ 0 (gradient ≤ 0)' : '≥ 0';
+  
+  requestAnimationFrame(draw);
+}
+
+// Event handlers
+document.getElementById('engage').onclick = () => {
+  warpActive = !warpActive;
+  const status = document.getElementById('status');
+  if (warpActive) {
+    status.innerHTML = "<span style='color:#0ff;'>⚡ WARP BUBBLE ACTIVE</span><br>" +
+                      "Viscosity gradient engaged<br>";
+  } else {
+    status.innerHTML = "Vacuum stable. Impulse power.";
+  }
+};
+
+document.getElementById('ftl').onclick = () => {
+  ftlMode = !ftlMode;
+  const status = document.getElementById('status');
+  if (ftlMode) status.innerHTML += "<br><span style='color:#f00;'>🚀 FTL MODE ENGAGED</span>";
+};
+
+window.addEventListener('resize', () => {
+  width = window.innerWidth;
+  height = window.innerHeight;
+  canvas.width = width;
+  canvas.height = height;
+});
+
+// Start
+draw();
+</script>
+
+</body>
+</html>
