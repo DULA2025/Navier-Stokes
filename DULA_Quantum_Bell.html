@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DULA Quantum Bell Test: Entanglement is Geometry</title>
+<style>
+  body { 
+    margin:0; overflow:hidden; background:#000; 
+    font-family:'Courier New', monospace; 
+  }
+  canvas { display:block; cursor: ew-resize; }
+  #ui {
+    position:absolute; top:20px; left:20px; z-index:10;
+    background:rgba(0,0,0,0.9); padding:20px; border-left:4px solid #ff00ff;
+    color:#ff00ff; max-width:400px;
+  }
+  .title { font-size:1.5em; font-weight:bold; text-shadow:0 0 10px #ff00ff; }
+  .stat { color:#fff; margin-top:5px; font-size:0.9em; }
+  .val { color:#0ff; font-weight:bold; }
+  
+  #mode-switch {
+    position:absolute; bottom:30px; left:50%; transform:translateX(-50%);
+    background:#222; border:2px solid #fff; color:#fff; padding:10px 20px;
+    cursor:pointer; font-family:inherit; font-weight:bold;
+  }
+  #mode-switch:hover { background:#fff; color:#000; }
+</style>
+</head>
+<body>
+
+<div id="ui">
+  <div class="title">QUANTUM BELL TEST</div>
+  <div>Non-Locality via Lattice Connection</div>
+  <div style="margin:10px 0; border-top:1px solid #444;"></div>
+  <div class="stat">PARTICLE A SPIN: <span class="val" id="spin-a">UP</span></div>
+  <div class="stat">PARTICLE B SPIN: <span class="val" id="spin-b">DOWN</span></div>
+  <div class="stat">CORRELATION: <span class="val">100% (Instant)</span></div>
+  <div class="stat">VIEW: <span class="val" id="view-mode">3D PROJECTION (Spooky)</span></div>
+  <div style="margin-top:15px; color:#888; font-size:0.8em;">
+    > Drag to spin Particle A.<br>
+    > Observe instant reaction of Particle B.<br>
+    > Toggle View to see the Filament.
+  </div>
+</div>
+
+<button id="mode-switch">TOGGLE DIMENSIONAL VIEW</button>
+<canvas id="canvas"></canvas>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+let width = window.innerWidth;
+let height = window.innerHeight;
+canvas.width = width;
+canvas.height = height;
+
+// State
+let angle = 0;
+let velocity = 0.05;
+let isDragging = false;
+let lastX = 0;
+let showFilament = false; // 3D vs 4D view
+
+// Particles
+const pA = { x: -200, y: 0, color: '#00ffff' };
+const pB = { x: 200, y: 0, color: '#ff0055' };
+
+// Filament Physics (Spring/Rod)
+let tension = 0;
+
+// Input
+canvas.addEventListener('mousedown', e => { isDragging = true; lastX = e.clientX; velocity = 0; });
+window.addEventListener('mouseup', () => isDragging = false);
+canvas.addEventListener('mousemove', e => {
+    if(isDragging) {
+        const dx = e.clientX - lastX;
+        angle += dx * 0.01;
+        velocity = dx * 0.01;
+        lastX = e.clientX;
+    }
+});
+
+document.getElementById('mode-switch').onclick = () => {
+    showFilament = !showFilament;
+    document.getElementById('view-mode').innerText = showFilament ? "24D LATTICE (Connected)" : "3D PROJECTION (Spooky)";
+    document.getElementById('view-mode').style.color = showFilament ? "#0f0" : "#ff00ff";
+};
+
+function draw() {
+    // Physics: Decay velocity
+    if(!isDragging) {
+        angle += velocity;
+        velocity *= 0.98; // Friction
+    }
+    
+    // Update UI
+    const spinVal = Math.sin(angle);
+    document.getElementById('spin-a').innerText = spinVal > 0 ? "UP (" + spinVal.toFixed(2) + ")" : "DOWN (" + spinVal.toFixed(2) + ")";
+    document.getElementById('spin-b').innerText = spinVal > 0 ? "DOWN (" + (-spinVal).toFixed(2) + ")" : "UP (" + (-spinVal).toFixed(2) + ")";
+    
+    // Render
+    ctx.fillStyle = 'black';
+    ctx.fillRect(0, 0, width, height);
+    
+    const cx = width/2;
+    const cy = height/2;
+    
+    // 1. Draw Filament (The Hidden Variable)
+    if (showFilament) {
+        // Draw the "Wormhole" or Lattice Link
+        // It vibrates with the spin
+        const segments = 20;
+        ctx.beginPath();
+        ctx.moveTo(cx + pA.x, cy + pA.y);
+        
+        for(let i=1; i<segments; i++) {
+            const t = i/segments;
+            const x = cx + pA.x + (pB.x - pA.x) * t;
+            // The wave function of the connection
+            const y = cy + Math.sin(angle + t*Math.PI*4) * 30 * (1-Math.abs(t-0.5)*2); 
+            ctx.lineTo(x, y);
+        }
+        ctx.lineTo(cx + pB.x, cy + pB.y);
+        
+        ctx.strokeStyle = `rgba(0, 255, 0, ${0.5 + Math.abs(velocity)*5})`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        // Lattice Grid Background (Faint)
+        ctx.strokeStyle = '#111';
+        ctx.lineWidth = 1;
+        for(let i=-10; i<=10; i++) {
+            ctx.beginPath(); ctx.moveTo(cx-300, cy+i*20); ctx.lineTo(cx+300, cy+i*20); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(cx+i*30, cy-100); ctx.lineTo(cx+i*30, cy+100); ctx.stroke();
+        }
+    }
+    
+    // 2. Draw Particle A
+    drawSpinningParticle(cx + pA.x, cy + pA.y, angle, pA.color);
+    
+    // 3. Draw Particle B (Opposite Spin)
+    // In DULA, B is the "anti-particle" end of the filament, so it spins opposite
+    drawSpinningParticle(cx + pB.x, cy + pB.y, -angle + Math.PI, pB.color);
+    
+    requestAnimationFrame(draw);
+}
+
+function drawSpinningParticle(x, y, ang, color) {
+    // Draw "Sphere" representation
+    const size = 40;
+    
+    // Orbiting electron/phase marker
+    const px = x + Math.cos(ang) * size;
+    const py = y + Math.sin(ang) * size;
+    
+    // Glow
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, size*2);
+    grad.addColorStop(0, color);
+    grad.addColorStop(1, 'transparent');
+    ctx.fillStyle = grad;
+    ctx.globalAlpha = 0.2;
+    ctx.beginPath(); ctx.arc(x, y, size*2, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1.0;
+    
+    // Core
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI*2); ctx.fill();
+    
+    // Vector Arrow
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(px, py);
+    ctx.stroke();
+    
+    // Arrowhead
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(px, py, 8, 0, Math.PI*2); ctx.fill();
+}
+
+window.onresize = () => {
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = width;
+    canvas.height = height;
+};
+
+draw();
+</script>
+
+</body>
+</html>
