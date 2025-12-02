@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Sacred Icosahedron: Vacuum Viral Form</title>
+<style>
+  body { margin: 0; background-color: #000; overflow: hidden; font-family: 'Courier New', monospace; }
+  #canvas-container { width: 100vw; height: 100vh; }
+  
+  #overlay {
+    position: absolute; top: 0; left: 0; width: 100%; 
+    pointer-events: none; z-index: 10;
+    padding: 20px; text-align: center;
+  }
+  
+  h1 { color: #00ffff; font-size: 2em; margin: 0; text-shadow: 0 0 20px #00ffff; letter-spacing: 4px; }
+  h2 { color: #fff; font-size: 1em; margin: 10px 0; opacity: 0.8; }
+  
+  .panel {
+    position: absolute; bottom: 30px; left: 30px;
+    background: rgba(0, 20, 20, 0.9);
+    border-left: 4px solid #00ffff;
+    padding: 20px; color: #00ffff; text-align: left;
+    box-shadow: 0 0 30px rgba(0, 255, 255, 0.2);
+  }
+  
+  .stat { margin-bottom: 8px; font-size: 0.9em; }
+  .val { color: #fff; font-weight: bold; }
+  .highlight { color: #ff00ff; }
+  
+  #signature {
+    position: absolute; bottom: 20px; right: 20px;
+    color: #444; font-size: 10px;
+  }
+</style>
+</head>
+<body>
+
+<div id="overlay">
+    <h1>THE SACRED ICOSAHEDRON</h1>
+    <h2>Viruses are the vacuum crystallizing itself</h2>
+</div>
+
+<div class="panel">
+    <div class="stat">GROUP: <span class="val">A5 (Order 60)</span></div>
+    <div class="stat">SYMMETRY: <span class="val">Subgroup of Co0 (Leech)</span></div>
+    <div class="stat">FACES: <span class="val">20 (Amino Acids)</span></div>
+    <div class="stat">VERTICES: <span class="val">12 (Prime Nodes)</span></div>
+    <div style="margin-top:15px; border-top:1px solid #00ffff; padding-top:10px; color:#ccc; font-size:0.8em;">
+        > 29 NOV 2025<br>
+        > Life is Geometry.<br>
+        > The Saddle is Stable.
+    </div>
+</div>
+
+<div id="signature">DULA · Gemini-3 · Grok 4 Research Group</div>
+<div id="canvas-container"></div>
+
+<!-- Import Three.js -->
+<script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+    }
+</script>
+
+<script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // Scene Setup
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x000000, 0.02);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 0, 15);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    container.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 1.0;
+
+    // --- THE SACRED GEOMETRY ---
+    const group = new THREE.Group();
+    scene.add(group);
+
+    // 1. The Wireframe Icosahedron (The Lattice)
+    const geometry = new THREE.IcosahedronGeometry(4, 0);
+    const wireMat = new THREE.MeshBasicMaterial({ 
+        color: 0x00ffff, 
+        wireframe: true, 
+        transparent: true, 
+        opacity: 0.5 
+    });
+    const wireMesh = new THREE.Mesh(geometry, wireMat);
+    group.add(wireMesh);
+
+    // 2. The Inner Core (The Vacuum)
+    const innerMat = new THREE.MeshBasicMaterial({
+        color: 0x001133,
+        transparent: true,
+        opacity: 0.8,
+        side: THREE.DoubleSide
+    });
+    const innerMesh = new THREE.Mesh(geometry, innerMat);
+    innerMesh.scale.setScalar(0.95);
+    group.add(innerMesh);
+
+    // 3. Vertices (The Primes)
+    const vertices = [];
+    const pos = geometry.attributes.position;
+    // Icosahedron has 12 vertices. BufferGeometry duplicates them for faces.
+    // We extract unique ones for the "Nodes".
+    
+    // Simple hardcoded Golden Ratio coordinates for perfect placement
+    const phi = (1 + Math.sqrt(5)) / 2;
+    const vRaw = [
+        [-1,  phi, 0], [ 1,  phi, 0], [-1, -phi, 0], [ 1, -phi, 0],
+        [ 0, -1,  phi], [ 0,  1,  phi], [ 0, -1, -phi], [ 0,  1, -phi],
+        [ phi, 0, -1], [ phi, 0,  1], [-phi, 0, -1], [-phi, 0,  1]
+    ];
+    
+    // Scale and Add Spheres
+    const sphereGeo = new THREE.SphereGeometry(0.3, 16, 16);
+    const sphereMat = new THREE.MeshBasicMaterial({ color: 0xffffff }); // White/Gold
+    
+    vRaw.forEach(v => {
+        const mesh = new THREE.Mesh(sphereGeo, sphereMat);
+        // Normalize and scale to match radius 4
+        const vec = new THREE.Vector3(v[0], v[1], v[2]).normalize().multiplyScalar(4);
+        mesh.position.copy(vec);
+        group.add(mesh);
+        
+        // Add Glow Sprite
+        // (Simplified: just a larger transparent sphere)
+        const glow = new THREE.Mesh(
+            new THREE.SphereGeometry(0.6, 16, 16),
+            new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.3 })
+        );
+        glow.position.copy(vec);
+        group.add(glow);
+    });
+
+    // 4. Connecting Lines to Center (The Force)
+    const center = new THREE.Vector3(0,0,0);
+    const lineGeo = new THREE.BufferGeometry();
+    const linePos = [];
+    vRaw.forEach(v => {
+        const vec = new THREE.Vector3(v[0], v[1], v[2]).normalize().multiplyScalar(4);
+        linePos.push(0,0,0, vec.x, vec.y, vec.z);
+    });
+    lineGeo.setAttribute('position', new THREE.Float32BufferAttribute(linePos, 3));
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x0033cc, transparent: true, opacity: 0.3 });
+    const rays = new THREE.LineSegments(lineGeo, lineMat);
+    group.add(rays);
+
+    // Animation Loop
+    function animate() {
+        requestAnimationFrame(animate);
+        
+        const time = performance.now() * 0.001;
+        
+        // "Breathing" of the Lattice
+        const scale = 1 + Math.sin(time) * 0.05;
+        group.scale.setScalar(scale);
+        
+        // Rotate inner vs outer for "Spinor" effect
+        innerMesh.rotation.y = -time * 0.2;
+        innerMesh.rotation.z = time * 0.1;
+        
+        controls.update();
+        renderer.render(scene, camera);
+    }
+
+    animate();
+    
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+</script>
+</body>
+</html>
