@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sphere wake — subcritical regime</title>
+<style>
+    :root {
+        --ink: #e9eff5; --dim: #7d92a6; --cyan: #2ad4ff;
+        --good: #4dffc9; --warn: #ffb454; --bad: #ff6b81;
+    }
+    html, body { height: 100%; }
+    body {
+        margin: 0; background: #010309; color: var(--ink);
+        font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+        overflow: hidden;
+    }
+    canvas { display: block; touch-action: none; }
+
+    #panel {
+        position: absolute; top: 16px; left: 16px; z-index: 10;
+        width: min(376px, calc(100vw - 32px));
+        background: rgba(5, 8, 16, 0.87); backdrop-filter: blur(14px);
+        border: 1px solid rgba(42, 212, 255, 0.24); border-radius: 8px;
+        padding: 17px 20px 14px; box-shadow: 0 18px 60px rgba(0,0,0,0.92);
+        pointer-events: none;
+    }
+    #panel h1 { margin: 0; font-size: 17px; font-weight: 600; color: var(--cyan); }
+    #panel .lede {
+        margin: 6px 0 12px; font-size: 12.5px; line-height: 1.5; color: var(--dim);
+        padding-bottom: 9px; border-bottom: 1px solid rgba(255,255,255,0.09);
+    }
+    .grp { margin: 10px 0 3px; font-size: 11.5px; color: #5f7387; letter-spacing: 0.3px; }
+    .row { display: flex; justify-content: space-between; gap: 12px; margin: 4px 0; font-size: 12.5px; }
+    .row span:first-child { color: var(--dim); }
+    .num {
+        font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        font-size: 12px; font-variant-numeric: tabular-nums; color: var(--good);
+    }
+    .num.warn { color: var(--warn); }
+    .num.bad { color: var(--bad); }
+    .legend {
+        margin-top: 11px; padding-top: 9px; border-top: 1px dashed rgba(255,255,255,0.13);
+        font-size: 12px; line-height: 1.7; color: #93a3b3;
+    }
+    .legend i { font-style: normal; font-weight: 600; }
+    #gui { position: absolute; top: 16px; right: 16px; z-index: 10; }
+    #boot {
+        position: absolute; inset: 0; display: grid; place-items: center; z-index: 99;
+        background: #010309; color: var(--cyan); font-size: 14px; text-align: center;
+        padding: 24px; transition: opacity .6s ease;
+    }
+    #boot.gone { opacity: 0; pointer-events: none; }
+    @media (max-width: 760px) { #gui { top: auto; bottom: 14px; right: 14px; } }
+    @media (prefers-reduced-motion: reduce) { #boot { transition: none; } }
+</style>
+</head>
+<body>
+
+<div id="boot">Seeding the wake…</div>
+
+<div id="panel">
+    <h1>Sphere wake</h1>
+    <p class="lede">
+        Tracers in a stream-function base flow past a sphere, with shed vortex
+        filaments that are born at the body and convect away. Drag coefficient,
+        shedding frequency and wake spreading are derived from Reynolds number.
+    </p>
+
+    <div class="grp">Regime</div>
+    <div class="row"><span>Reynolds number</span><span id="r-re" class="num">10,000</span></div>
+    <div class="row"><span>Regime</span><span id="r-regime" class="num">subcritical</span></div>
+    <div class="row"><span>Drag coefficient C<sub>d</sub></span><span id="r-cd" class="num">0.41</span></div>
+    <div class="row"><span>Separation angle &phi;<sub>s</sub></span><span id="r-sep" class="num">83&deg;</span></div>
+
+    <div class="grp">Shedding</div>
+    <div class="row"><span>Strouhal number</span><span id="r-st" class="num">0.190</span></div>
+    <div class="row"><span>Frequency f<sub>s</sub></span><span id="r-fs" class="num">0.304 Hz</span></div>
+    <div class="row"><span>Street spacing &lambda;/D</span><span id="r-lam" class="num">4.48</span></div>
+    <div class="row"><span>Circulation &Gamma;/(UD)</span><span id="r-gam" class="num">0.90</span></div>
+    <div class="row"><span>Eddy viscosity &nu;<sub>t</sub>/&nu;</span><span id="r-nut" class="num">50</span></div>
+    <div class="row"><span>Core &sigma;&#8320;/D &rarr; outlet</span><span id="r-sig" class="num">0.16 &rarr; 0.16</span></div>
+
+    <div class="grp">State</div>
+    <div class="row"><span>Recirculation L<sub>r</sub>/D</span><span id="r-lr" class="num">1.00</span></div>
+    <div class="row"><span>Live filaments</span><span id="r-fil" class="num">0 / 12</span></div>
+    <div class="row"><span>Wake front</span><span id="r-front" class="num">0.0 D</span></div>
+    <div class="row"><span>Tracers</span><span id="r-n" class="num">262144</span></div>
+    <div class="row"><span>Frame time</span><span id="r-ms" class="num">—</span></div>
+
+    <div class="legend">
+        Colour is spanwise vorticity, &omega;D/U.
+        <i style="color:#2ad4ff">Cyan</i> irrotational,
+        <i style="color:#ffab2e">amber</i> &omega; &gt; 0,
+        <i style="color:#ff3fc0">magenta</i> &omega; &lt; 0,
+        <i style="color:#ffffff">white</i> core.<br>
+        Drag the sphere to steer it. Drag anywhere else to orbit.
+    </div>
+</div>
+
+<div id="gui"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import Stats from 'three/addons/libs/stats.module.js';
+
+/* ===================================================================
+   WHAT IS DERIVED RATHER THAN DIALLED
+
+   Cd(Re)   Clift-Gauvin correlation, plus a crude drag crisis above 3e5.
+   St(Re)   no shedding below ~270; hairpin mode 270-800; ~0.19 plateau
+            through the subcritical range; rises past the drag crisis.
+   phi_s    laminar separation ~83 deg from front stagnation subcritically,
+            moving aft to ~120 deg once the boundary layer trips.
+   L_r      recirculation length ~1.0 D subcritically.
+   deficit  far-wake amplitude fixed by the momentum integral, so
+            U*dU*pi*b^2 = 0.5*Cd*U^2*pi*R^2. With b ~ x^(1/3) this
+            reproduces the dU ~ x^(-2/3) law for an axisymmetric wake
+            without it being imposed by hand.
+   lambda   street spacing = U_c / f_s.
+   spread   Karman's h/lambda = 0.281, halved for a hairpin wake.
+   sigma(t) Lamb-Oseen core growth sigma^2 = sigma0^2 + 4*nu_t*t, with nu_t
+            an explicit eddy viscosity. The previous version wrote
+            4*nu*60*age: the 60 was an invented constant with no name. A
+            subcritical wake really does diffuse at nu_t/nu of order 10-100,
+            so the factor is legitimate, but only once it is called what it
+            is and shown in the panel.
+
+   The base flow is still one stream function, so everything meridional
+   is divergence-free including the recirculation bubble and the deficit.
+   The wake is still regularized Biot-Savart over Lagrangian filaments,
+   so it is causal and remembers where it was shed.
+   =================================================================== */
+
+const MAXFIL = 12;
+const NODES  = 7;
+const QUALITY = { Low: 256, Medium: 512, High: 1024 };
+const XMIN = -48, XMAX = 56;
+
+const params = {
+    // primary
+    uInf: 20.0,
+    sphereRadius: 4.0,
+    viscosity: 0.004,        // Re = U*D/nu = 20*8/0.004 = 40,000
+    // derivation switches
+    autoStrouhal: true,
+    autoCirculation: true,
+    autoSpread: true,
+    // overrides, used when the matching switch is off
+    strouhal: 0.190,
+    gammaRatio: 0.90,        // Gamma / (U*D)
+    spreadRatio: 0.14,       // head offset / lambda
+    // filament shape
+    eddyRatio: 50,           // nu_t / nu, the turbulent closure for core growth
+    coreRatio: 0.16,         // sigma0 / D
+    legSpanRatio: 0.55,      // leg separation / D
+    legLenRatio: 2.6,        // stretched leg length / D
+    precession: 0.18,        // radians of shedding-plane rotation per shed
+    // near field
+    bubbleStrength: 0.32,    // peak reverse velocity on the axis, over U
+    viscousBlend: 2.2,
+    // display
+    tracerSpeed: 1.0,
+    stepCap: 30.0,
+    pointSize: 2.0,
+    bloom: 0.34,
+    exposure: 1.0,
+    palette: 1,
+    seedMode: 1,             // 0 shear layer only, 1 mixed, 2 upstream rake
+    autoQuality: true,
+    quality: 'High',
+    reset: () => seedParticles()
+};
+
+const derived = {
+    D: 5, Re: 1e4, Cd: 0.41, St: 0.19, fs: 0.304, lambda: 22.4, Uc: 6.8,
+    gamma: 36, sigma0: 0.8, nuT: 0.2, sigmaOut: 0.8, spread: 3.1,
+    sepAngle: 83, Lr: 5, regime: 'subcritical'
+};
+
+const obstacle = { pos: new THREE.Vector3(-16, 0, 0), vel: new THREE.Vector3() };
+
+let scene, camera, renderer, composer, controls, clock, stats, bloomPass;
+let fboA, fboB, gpgpuScene, gpgpuCam, gpgpuQuad, seedMat, updateMat, renderMat;
+let points, pointsGeo, sphereMesh, equatorRing, sepRing, domainBox;
+let seedTexture = null, res = QUALITY[params.quality];
+
+const filPos  = Array.from({ length: MAXFIL }, () => new THREE.Vector4(0, 0, 0, -1e6));
+const filMeta = Array.from({ length: MAXFIL }, () => new THREE.Vector4(1, 0, 0, 0));
+let shedCount = 0, nextShed = 0, simTime = 0;
+
+const raycaster = new THREE.Raycaster();
+const pointerNDC = new THREE.Vector2();
+const dragPlane = new THREE.Plane();
+const dragHit = new THREE.Vector3();
+const dragOffset = new THREE.Vector3();
+let dragging = false, activePointer = null;
+
+let lastFrameStamp = 0, msEMA = 16, qualityCooldown = 0;
+
+/* ===================================================================
+   CORRELATIONS
+   =================================================================== */
+
+// Clift & Gauvin (1971), valid to Re ~ 3e5, with a crude post-crisis branch.
+function dragCoefficient(Re) {
+    const R = Math.max(Re, 1e-3);
+    const sub = 24 / R * (1 + 0.15 * Math.pow(R, 0.687)) + 0.42 / (1 + 42500 * Math.pow(R, -1.16));
+    const crisis = THREE.MathUtils.smoothstep(Math.log10(R), 5.4, 5.8);
+    return THREE.MathUtils.lerp(sub, 0.12, crisis);
+}
+
+function strouhalNumber(Re) {
+    if (Re < 270) return 0;                              // steady wake, no shedding
+    if (Re < 800) return THREE.MathUtils.lerp(0.13, 0.185, (Re - 270) / 530);
+    const post = THREE.MathUtils.smoothstep(Math.log10(Re), 5.4, 5.8);
+    return THREE.MathUtils.lerp(0.19, 0.30, post);       // rises after the crisis
+}
+
+function separationAngle(Re) {
+    if (Re < 300) return THREE.MathUtils.lerp(180, 100, THREE.MathUtils.clamp(Re / 300, 0, 1));
+    const post = THREE.MathUtils.smoothstep(Math.log10(Re), 5.4, 5.8);
+    return THREE.MathUtils.lerp(83, 120, post);
+}
+
+function regimeName(Re) {
+    if (Re < 24) return 'creeping, attached';
+    if (Re < 210) return 'steady toroidal eddy';
+    if (Re < 270) return 'steady double-thread';
+    if (Re < 800) return 'periodic hairpins';
+    if (Re < 3.5e5) return 'subcritical';
+    return 'supercritical';
+}
+
+function recomputeDerived() {
+    const D = 2 * params.sphereRadius;
+    const Re = params.uInf * D / Math.max(params.viscosity, 1e-6);
+    const Cd = dragCoefficient(Re);
+    const St = params.autoStrouhal ? strouhalNumber(Re) : params.strouhal;
+    const fs = St > 0 ? St * params.uInf / D : 0;
+    const Uc = 0.85 * params.uInf;
+    const lambda = fs > 0 ? Uc / fs : 1e9;
+    const gammaRatio = params.autoCirculation
+        ? THREE.MathUtils.clamp(1.6 * Cd, 0.15, 1.5)     // stronger drag, stronger rollers
+        : params.gammaRatio;
+    const spreadRatio = params.autoSpread ? 0.5 * 0.281 : params.spreadRatio; // Karman h/lambda
+
+    const nuT = params.eddyRatio * params.viscosity;
+    const sigma0 = params.coreRatio * D;
+    // Core size a filament reaches by the time it leaves the domain.
+    const transit = (XMAX - obstacle.pos.x) / Math.max(Uc, 1e-3);
+    Object.assign(derived, {
+        D, Re, Cd, St, fs, Uc, lambda, nuT, sigma0,
+        sigmaOut: Math.sqrt(sigma0 * sigma0 + 4 * nuT * transit),
+        gamma: gammaRatio * params.uInf * D,
+        spread: Math.min(spreadRatio * lambda, 2.0 * D),
+        sepAngle: separationAngle(Re),
+        Lr: (Re < 270 ? 0.6 : 1.0) * D,
+        regime: regimeName(Re)
+    });
+}
+
+/* ===================================================================
+   SHARED GLSL
+   =================================================================== */
+
+const FIELD_UNIFORMS = `
+    uniform vec3  uSpherePos, uSphereVel;
+    uniform float uSphereR, uUinf, uTime, uBlend;
+    uniform float uCd, uLr, uBubble;
+    uniform float uGamma, uSigma0, uSpread, uLegSpan, uLegLen, uNuT;
+    uniform vec4  uFil[${MAXFIL}];
+    uniform vec4  uFilMeta[${MAXFIL}];
+`;
+
+const FIELD_GLSL = `
+    const float PI = 3.14159265;
+    const float FOURPI = 12.5663706;
+
+    /* ---------- axisymmetric Stokes stream function ---------- */
+    float psiBase(float x, float rho, float R, float Urel) {
+        float r = sqrt(x * x + rho * rho);
+        if (r < 1e-4) return 0.0;
+        float D = 2.0 * R;
+        float k = R / max(r, 1e-4), k3 = k * k * k;
+
+        // Body: Stokes solution near the wall (no-slip) blending to potential
+        // flow outside. Both factors vanish at r = R, so psi = 0 on the sphere
+        // for any blend weight and no-penetration is exact.
+        float fStokes = 1.0 - 1.5 * k + 0.5 * k3;
+        float fPot    = 1.0 - k3;
+        float w = smoothstep(R, uBlend * R, r);
+        float psi = 0.5 * Urel * rho * rho * mix(fStokes, fPot, w);
+
+        if (x <= 0.0 || r < R) return psi;
+
+        // Closed recirculation bubble of length uLr. u_x on the axis is
+        // -2*Psi0/b^2, so Psi0 = 0.5*uBubble*Urel*b^2 gives the requested
+        // reverse velocity, and u_x flips sign at rho = b: a real eddy.
+        float bb = 0.42 * D;
+        float g  = sin(PI * clamp(x / max(uLr, 1e-3), 0.0, 1.0));
+        float s  = rho * rho / (bb * bb);
+        psi += -0.5 * uBubble * Urel * bb * bb * g * g * s * exp(-s);
+
+        // Far wake. Amplitude comes from the momentum integral rather than a
+        // slider: U*dU*pi*b^2 = 0.5*Cd*U^2*pi*R^2, with b growing as x^(1/3),
+        // which yields the classic dU ~ x^(-2/3) axisymmetric decay.
+        float xs = max(x - 0.5 * uLr, 0.0);
+        float b  = 0.42 * D * pow(1.0 + xs / D, 0.3333);
+        float dU = 0.5 * uCd * Urel * R * R / (b * b);
+        float ramp = smoothstep(0.0, 0.8 * uLr, x);
+        psi += -0.5 * dU * b * b * (1.0 - exp(-rho * rho / (b * b))) * ramp;
+
+        return psi;
+    }
+
+    vec3 baseFlow(vec3 p) {
+        vec3 d = p - uSpherePos;
+        float R = uSphereR;
+        float Urel = uUinf - uSphereVel.x;
+
+        float rho = length(d.yz);
+        float hx = 0.02 * R, hr = 0.02 * R;
+        float rhoS = max(rho, 0.5 * hr);
+
+        float ux   =  (psiBase(d.x, rhoS + hr, R, Urel) - psiBase(d.x, max(rhoS - hr, 1e-4), R, Urel))
+                     / (2.0 * hr * rhoS);
+        float urho = -(psiBase(d.x + hx, rhoS, R, Urel) - psiBase(d.x - hx, rhoS, R, Urel))
+                     / (2.0 * hx * rhoS);
+
+        vec2 er = rho > 1e-4 ? d.yz / rho : vec2(0.0);
+        vec3 v = vec3(ux, urho * er.x, urho * er.y);
+
+        // Exact translating-sphere dipole for transverse motion: divergence-free
+        // and satisfies u.n = W.n on the surface.
+        vec3 W = vec3(0.0, uSphereVel.y, uSphereVel.z);
+        float r = max(length(d), R);
+        vec3 rh = d / r;
+        float s = (R * R * R) / (2.0 * r * r * r);
+        v += s * (3.0 * dot(W, rh) * rh - W);
+        return v;
+    }
+
+    /* ---------- filaments ---------- */
+    vec3 filNode(int i, float f) {
+        vec4 birth = uFil[i];
+        vec4 meta  = uFilMeta[i];
+        float age = uTime - birth.w;
+        float D = 2.0 * uSphereR;
+        float Uh = 0.85 * uUinf;
+
+        float xHead = birth.x + Uh * age;
+        float legL  = min(0.30 * D + 0.5 * uUinf * age, uLegLen);
+        float lift  = meta.x * uSpread * smoothstep(0.0, 0.5 * D / max(Uh, 0.1), age);
+
+        float phi = meta.y;
+        vec3 eLift = vec3(0.0,  cos(phi), sin(phi));
+        vec3 eSpan = vec3(0.0, -sin(phi), cos(phi));
+
+        float th = PI * f, s = sin(th), c = cos(th);
+        vec3 n = vec3(xHead - legL * (1.0 - s), 0.0, 0.0)
+               + eLift * (lift * s) + eSpan * (0.5 * uLegSpan * c);
+        n.y += birth.y; n.z += birth.z;
+        return n;
+    }
+
+    // Lamb-Oseen core growth, exactly sigma^2 = sigma0^2 + 4*nu_t*t.
+    // nu_t is the eddy viscosity, shown in the panel; no unnamed multiplier.
+    float filSigma(int i) {
+        float age = max(uTime - uFil[i].w, 0.0);
+        return sqrt(uSigma0 * uSigma0 + 4.0 * uNuT * age);
+    }
+
+    float filAlive(int i) { return uTime - uFil[i].w >= 0.0 ? uFilMeta[i].z : 0.0; }
+
+    // Biot-Savart with a Gaussian (Lamb-Oseen) core rather than the
+    // Rosenhead cutoff. For a straight filament this reproduces the exact
+    // viscous swirl u = (Gamma/2*pi*d)(1 - exp(-d^2/sigma^2)), so the near
+    // field is the heat-equation solution instead of an algebraic stand-in.
+    vec3 segVel(vec3 p, vec3 a, vec3 b, float gamma, float sig2) {
+        vec3 r1 = p - a, r2 = p - b, L = b - a;
+        vec3 cr = cross(r1, r2);
+        float cr2 = dot(cr, cr);
+        float L2 = max(dot(L, L), 1e-8);
+        float n1 = max(length(r1), 1e-4), n2 = max(length(r2), 1e-4);
+        float k = dot(L, r1 / n1 - r2 / n2);
+        float sc = (cr2 / L2) / max(sig2, 1e-8);          // (d / sigma)^2
+        // Series form near the axis keeps core/cr2 finite as cr2 -> 0.
+        float core = sc < 1e-3 ? sc - 0.5 * sc * sc : 1.0 - exp(-sc);
+        return (gamma / FOURPI) * cr * (k * core / max(cr2, 1e-12));
+    }
+
+    vec3 wakeFlow(vec3 p) {
+        vec3 v = vec3(0.0);
+        float D = 2.0 * uSphereR;
+        for (int i = 0; i < ${MAXFIL}; i++) {
+            float alive = filAlive(i);
+            if (alive < 0.01) continue;
+
+            vec3 head = filNode(i, 0.5), root = filNode(i, 0.0);
+            vec3 mid = 0.5 * (head + root);
+            float reach = 0.5 * length(head - root) + uLegSpan + 2.5 * D;
+            float dist = length(p - mid);
+            if (dist > reach + 4.0 * D) continue;
+
+            float sig = filSigma(i);
+            float g = uGamma * uFilMeta[i].x * alive
+                    * (1.0 - smoothstep(reach, reach + 4.0 * D, dist));
+
+            vec3 prev = root;
+            for (int j = 1; j < ${NODES}; j++) {
+                vec3 cur = filNode(i, float(j) / float(${NODES - 1}));
+                v += segVel(p, prev, cur, g, sig * sig);
+                prev = cur;
+            }
+        }
+        return v;
+    }
+
+    vec3 flowAt(vec3 p) { return baseFlow(p) + wakeFlow(p); }
+
+    /* ---------- vorticity, for CFD-style colouring ---------- */
+    float segDist(vec3 p, vec3 a, vec3 b) {
+        vec3 ab = b - a;
+        float t = clamp(dot(p - a, ab) / max(dot(ab, ab), 1e-6), 0.0, 1.0);
+        return length(p - (a + t * ab));
+    }
+
+    // Returns (|omega| D / U, signed spanwise omega D / U).
+    vec2 vorticityAt(vec3 p) {
+        float mag = 0.0, sgn = 0.0;
+        float D = 2.0 * uSphereR;
+        for (int i = 0; i < ${MAXFIL}; i++) {
+            float alive = filAlive(i);
+            if (alive < 0.01) continue;
+            float sig = filSigma(i);
+            float peak = uGamma * alive / (PI * sig * sig);
+            vec3 prev = filNode(i, 0.0);
+            for (int j = 1; j < ${NODES}; j++) {
+                vec3 cur = filNode(i, float(j) / float(${NODES - 1}));
+                float d = segDist(p, prev, cur) / sig;
+                float w = peak * exp(-d * d);
+                mag += w;
+                sgn += w * uFilMeta[i].x;
+                prev = cur;
+            }
+        }
+        float scale = D / max(uUinf, 0.1);
+        return vec2(mag * scale, sgn * scale);
+    }
+`;
+
+const QUAD_VS = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position,1.0); }`;
+
+/* w packs speed and age: floor(min(speed,255)*4)*32 + age */
+const UPDATE_FS = FIELD_UNIFORMS + `
+    uniform sampler2D uPositions;
+    uniform float uDt, uSpeedScale, uStepCap, uSepAngle;
+    uniform int uSeedMode;
+    varying vec2 vUv;
+` + FIELD_GLSL + `
+    float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453); }
+
+    vec3 respawn(vec2 uv, float t) {
+        float seed = hash(uv + vec2(t * 0.17, 3.1));
+        float ang  = uv.y * 6.2831853 + t * 0.09;
+        bool shear = uSeedMode == 0 ? true
+                   : uSeedMode == 2 ? false
+                   : uv.x < 0.58;
+        if (shear) {
+            // Ring at the separation line. uSepAngle is measured from the front
+            // stagnation point, so x = -R cos(phi).
+            float phi = radians(uSepAngle) + (seed - 0.5) * 0.16;
+            float rr = uSphereR * (1.03 + 0.16 * hash(vec2(uv.x, 1.23)));
+            return uSpherePos + vec3(-rr * cos(phi),
+                                      rr * sin(phi) * cos(ang),
+                                      rr * sin(phi) * sin(ang));
+        }
+        float discR = sqrt(seed) * uSphereR * 2.4;
+        return vec3(-46.0, uSpherePos.y + discR * cos(ang), uSpherePos.z + discR * sin(ang));
+    }
+
+    void main() {
+        vec4 data = texture2D(uPositions, vUv);
+        vec3 pos = data.xyz;
+        float age = mod(data.w, 32.0);
+
+        vec3 v1 = flowAt(pos);
+        v1 *= min(1.0, uStepCap / max(length(v1), 1e-4));
+        vec3 v2 = flowAt(pos + 0.5 * v1 * uDt * uSpeedScale);
+        float speed = length(v2);
+        v2 *= min(1.0, uStepCap / max(speed, 1e-4));
+
+        pos += v2 * uDt * uSpeedScale;
+        age += uDt;
+
+        vec3 d = pos - uSpherePos;
+        float r = length(d);
+        if (r < uSphereR * 1.008) pos = uSpherePos + (d / max(r, 1e-4)) * uSphereR * 1.010;
+
+        if (pos.x > ${XMAX.toFixed(1)} || pos.x < ${XMIN.toFixed(1)} ||
+            abs(pos.y) > 24.0 || abs(pos.z) > 24.0 || age > 30.0) {
+            pos = respawn(vUv, uTime);
+            age = 0.0;
+            speed = length(flowAt(pos));
+        }
+
+        gl_FragColor = vec4(pos, floor(min(speed, 255.0) * 4.0) * 32.0 + min(age, 31.5));
+    }
+`;
+
+const RENDER_VS = FIELD_UNIFORMS + `
+    uniform sampler2D uPositions;
+    uniform float uPointSize, uExposure;
+    uniform int uPalette;
+    varying vec3 vColor;
+    varying float vAlpha;
+` + FIELD_GLSL + `
+    void main() {
+        vec4 data = texture2D(uPositions, position.xy);
+        vec3 world = data.xyz;
+        float speed = floor(data.w / 32.0) / 4.0;
+
+        vec2 om = vorticityAt(world);
+        float mag = om.x;                              // |omega| D / U
+        float sgn = om.y;
+
+        vec3 col;
+        if (uPalette == 0) {
+            vec3 stream = vec3(0.05, 0.70, 1.00);
+            vec3 plus   = vec3(1.00, 0.63, 0.06);
+            vec3 minus  = vec3(1.00, 0.14, 0.66);
+            float t = clamp(abs(sgn) / 1.2, 0.0, 1.0);
+            col = mix(stream, sgn > 0.0 ? plus : minus, t);
+            col = mix(col, vec3(1.0), smoothstep(2.2, 3.6, mag) * 0.85);
+        } else if (uPalette == 1) {
+            float v = clamp(mag / 3.0, 0.0, 1.0);      // sequential |omega|
+            col = vec3(clamp(1.6 - abs(4.0*v - 3.0), 0.0, 1.0),
+                       clamp(1.6 - abs(4.0*v - 2.0), 0.0, 1.0),
+                       clamp(1.6 - abs(4.0*v - 1.0), 0.0, 1.0));
+        } else {
+            float v = clamp(speed / max(uUinf * 1.6, 0.1), 0.0, 1.0);
+            col = mix(vec3(0.02, 0.18, 0.55), vec3(1.0, 0.95, 0.75), v);
+        }
+
+        // Log luminance keeps the cores from clipping to a white blob.
+        float lum = clamp(log(1.0 + mag * 1.4) * 0.55, 0.0, 1.2);
+        vColor = col * (0.42 + lum) * uExposure;
+        vAlpha = clamp(0.16 + 0.20 * clamp(speed / max(uUinf, 0.1), 0.0, 2.0) + lum * 0.34, 0.12, 0.72);
+
+        vec4 mv = modelViewMatrix * vec4(world, 1.0);
+        gl_PointSize = clamp(uPointSize * (28.0 / -mv.z), 1.0, 7.0);
+        gl_Position = projectionMatrix * mv;
+    }
+`;
+
+const RENDER_FS = `
+    varying vec3 vColor; varying float vAlpha;
+    void main() {
+        vec2 c = gl_PointCoord - 0.5;
+        float d2 = dot(c, c);
+        if (d2 > 0.25) discard;
+        gl_FragColor = vec4(vColor, vAlpha * (1.0 - smoothstep(0.06, 0.25, d2)));
+    }
+`;
+
+/* ===================================================================
+   SETUP
+   =================================================================== */
+
+function init() {
+    recomputeDerived();
+
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 1000);
+    camera.position.set(-39.6, 16.0, 17.0);
+
+    renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;   // stops the additive blowout
+    renderer.toneMappingExposure = 1.0;
+    document.body.appendChild(renderer.domElement);
+
+    const boot = document.getElementById('boot');
+    if (renderer.capabilities.isWebGL2) {
+        if (!renderer.extensions.has('EXT_color_buffer_float')) {
+            boot.textContent = 'This browser blocks floating-point render targets.';
+            return false;
+        }
+    } else if (!renderer.extensions.has('OES_texture_float')) {
+        boot.textContent = 'This browser cannot render to floating-point textures.';
+        return false;
+    }
+
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+    controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.target.set(-5.9, 1.0, -0.8);
+    controls.minDistance = 8;
+    controls.maxDistance = 150;
+
+    clock = new THREE.Clock();
+    stats = new Stats();
+    Object.assign(stats.dom.style, { position: 'absolute', top: 'auto', bottom: '16px', left: '16px' });
+    document.body.appendChild(stats.dom);
+
+    buildSphere();
+    buildDomain();
+    buildGPGPU();
+    buildParticles(QUALITY[params.quality]);
+
+    bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 1.2, 0.5, 0.9);
+    bloomPass.threshold = 0.55;
+    bloomPass.strength = params.bloom;
+    bloomPass.radius = 0.5;
+    composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    composer.addPass(bloomPass);
+    composer.addPass(new OutputPass());
+
+    buildGUI();
+    bindPointer();
+    addEventListener('resize', onResize);
+    refreshPanel();
+    boot.classList.add('gone');
+    return true;
+}
+
+function buildSphere() {
+    sphereMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(1, 64, 48),
+        new THREE.MeshPhysicalMaterial({
+            color: 0x0c131e, roughness: 0.22, metalness: 0.85,
+            clearcoat: 0.85, clearcoatRoughness: 0.15
+        })
+    );
+    sphereMesh.scale.setScalar(params.sphereRadius);
+    sphereMesh.position.copy(obstacle.pos);
+    scene.add(sphereMesh);
+
+    equatorRing = ringMesh(0x1f6f8c, 0.35);
+    sepRing = ringMesh(0x00ffd0, 0.85);
+    updateRings();
+}
+
+function ringMesh(color, opacity) {
+    const m = new THREE.Mesh(
+        new THREE.TorusGeometry(1, 0.012, 12, 96),
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false })
+    );
+    m.rotation.y = Math.PI / 2;
+    scene.add(m);
+    return m;
+}
+
+function updateRings() {
+    const R = params.sphereRadius;
+    equatorRing.scale.setScalar(R * 1.005);
+    equatorRing.position.copy(obstacle.pos);
+
+    // Separation ring drawn where the boundary layer actually leaves the body.
+    const phi = THREE.MathUtils.degToRad(derived.sepAngle);
+    sepRing.scale.setScalar(R * Math.sin(phi) * 1.01);
+    sepRing.position.copy(obstacle.pos).x += -R * Math.cos(phi);
+}
+
+function buildDomain() {
+    domainBox = new THREE.LineSegments(
+        new THREE.EdgesGeometry(new THREE.BoxGeometry(XMAX - XMIN, 46, 46)),
+        new THREE.LineBasicMaterial({ color: 0x16293f, transparent: true, opacity: 0.2 })
+    );
+    domainBox.position.set((XMAX + XMIN) / 2, 0, 0);
+    scene.add(domainBox);
+}
+
+function fieldUniforms() {
+    return {
+        uSpherePos: { value: obstacle.pos.clone() },
+        uSphereVel: { value: new THREE.Vector3() },
+        uSphereR:   { value: params.sphereRadius },
+        uUinf:      { value: params.uInf },
+        uTime:      { value: 0 },
+        uBlend:     { value: params.viscousBlend },
+        uCd:        { value: derived.Cd },
+        uLr:        { value: derived.Lr },
+        uBubble:    { value: params.bubbleStrength },
+        uGamma:     { value: derived.gamma },
+        uSigma0:    { value: derived.sigma0 },
+        uSpread:    { value: derived.spread },
+        uLegSpan:   { value: params.legSpanRatio * derived.D },
+        uLegLen:    { value: params.legLenRatio * derived.D },
+        uNuT:       { value: derived.nuT },
+        uFil:       { value: filPos },
+        uFilMeta:   { value: filMeta }
+    };
+}
+
+function buildGPGPU() {
+    gpgpuCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    gpgpuScene = new THREE.Scene();
+    seedMat = new THREE.ShaderMaterial({
+        vertexShader: QUAD_VS,
+        fragmentShader: 'uniform sampler2D t; varying vec2 vUv; void main(){ gl_FragColor = texture2D(t,vUv); }',
+        uniforms: { t: { value: null } }
+    });
+    gpgpuQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), seedMat);
+    gpgpuScene.add(gpgpuQuad);
+
+    updateMat = new THREE.ShaderMaterial({
+        vertexShader: QUAD_VS, fragmentShader: UPDATE_FS,
+        uniforms: Object.assign(fieldUniforms(), {
+            uPositions:  { value: null },
+            uDt:         { value: 0.016 },
+            uSpeedScale: { value: params.tracerSpeed },
+            uStepCap:    { value: params.stepCap },
+            uSepAngle:   { value: derived.sepAngle },
+            uSeedMode:   { value: params.seedMode }
+        })
+    });
+
+    renderMat = new THREE.ShaderMaterial({
+        vertexShader: RENDER_VS, fragmentShader: RENDER_FS,
+        uniforms: Object.assign(fieldUniforms(), {
+            uPositions: { value: null },
+            uPointSize: { value: params.pointSize },
+            uExposure:  { value: params.exposure },
+            uPalette:   { value: params.palette }
+        }),
+        transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
+    });
+}
+
+function buildParticles(newRes) {
+    if (points) { scene.remove(points); pointsGeo.dispose(); fboA.dispose(); fboB.dispose(); }
+    res = newRes;
+
+    const opts = {
+        type: THREE.FloatType, format: THREE.RGBAFormat,
+        minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter,
+        depthBuffer: false, stencilBuffer: false
+    };
+    fboA = new THREE.WebGLRenderTarget(res, res, opts);
+    fboB = new THREE.WebGLRenderTarget(res, res, opts);
+
+    const n = res * res;
+    const refs = new Float32Array(n * 2);
+    for (let y = 0, i = 0; y < res; y++)
+        for (let x = 0; x < res; x++) { refs[i++] = x / (res - 1); refs[i++] = y / (res - 1); }
+
+    pointsGeo = new THREE.BufferGeometry();
+    pointsGeo.setAttribute('position', new THREE.BufferAttribute(refs, 2));
+    pointsGeo.boundingSphere = new THREE.Sphere(new THREE.Vector3(4, 0, 0), 1e4);
+
+    points = new THREE.Points(pointsGeo, renderMat);
+    points.frustumCulled = false;
+    scene.add(points);
+
+    seedParticles();
+    document.getElementById('r-n').textContent = n.toLocaleString('en-US');
+}
+
+function seedParticles() {
+    // A compact upstream stream tube rather than a uniform dust cloud: the
+    // free stream is uniform, so tracers seeded far off-axis contribute nothing
+    // but static.
+    const n = res * res;
+    const data = new Float32Array(n * 4);
+    const Rt = params.sphereRadius * 2.6;
+    for (let i = 0; i < n; i++) {
+        const j = i * 4;
+        const t = Math.random();
+        const rr = Math.sqrt(Math.random()) * Rt;
+        const a = Math.random() * Math.PI * 2;
+        data[j]     = -46 + t * 26;
+        data[j + 1] = obstacle.pos.y + rr * Math.cos(a);
+        data[j + 2] = obstacle.pos.z + rr * Math.sin(a);
+        data[j + 3] = t * 6;
+    }
+    if (seedTexture) seedTexture.dispose();
+    seedTexture = new THREE.DataTexture(data, res, res, THREE.RGBAFormat, THREE.FloatType);
+    seedTexture.needsUpdate = true;
+
+    seedMat.uniforms.t.value = seedTexture;
+    gpgpuQuad.material = seedMat;
+    renderer.setRenderTarget(fboA);
+    renderer.render(gpgpuScene, gpgpuCam);
+    renderer.setRenderTarget(null);
+}
+
+/* ===================================================================
+   SHEDDING AND RETIREMENT
+   =================================================================== */
+
+function updateShedding(t) {
+    if (derived.fs <= 0) return;                 // below the shedding threshold
+    const period = 1 / derived.fs;
+    let guard = 0;
+    while (t >= nextShed && guard++ < MAXFIL) {
+        const slot = shedCount % MAXFIL;
+        filPos[slot].set(obstacle.pos.x, obstacle.pos.y, obstacle.pos.z, nextShed);
+        filMeta[slot].set(shedCount % 2 === 0 ? 1 : -1, shedCount * params.precession, 1, 0);
+        shedCount++;
+        nextShed += period;
+    }
+    if (t > nextShed + 5 * period) nextShed = t;
+}
+
+function retireFilaments(t) {
+    // Once a filament has convected past the outlet it can only cost shader
+    // time, so take it out of the ring with a short fade rather than letting
+    // it live on a fixed timer.
+    let live = 0, front = XMIN;
+    const Uh = 0.85 * params.uInf;
+    for (let i = 0; i < MAXFIL; i++) {
+        const age = t - filPos[i].w;
+        if (age < 0) { filMeta[i].z = 0; continue; }
+        const headX = filPos[i].x + Uh * age;
+        const fade = 1 - THREE.MathUtils.smoothstep(headX, XMAX - 3 * derived.D, XMAX + derived.D);
+        filMeta[i].z = fade;
+        if (fade > 0.01) { live++; front = Math.max(front, headX); }
+    }
+    return { live, front: Math.min(front, XMAX) };
+}
+
+/* ===================================================================
+   UI
+   =================================================================== */
+
+function buildGUI() {
+    const gui = new GUI({ container: document.getElementById('gui'), title: 'Sphere wake' });
+    const onFlow = () => { recomputeDerived(); updateRings(); refreshPanel(); };
+
+    const f1 = gui.addFolder('Flow');
+    f1.add(params, 'uInf', 1, 20, 0.1).name('Free stream U').onChange(onFlow);
+    f1.add(params, 'sphereRadius', 1.5, 4, 0.1).name('Sphere radius R').onChange(v => {
+        sphereMesh.scale.setScalar(v); onFlow();
+    });
+    f1.add(params, 'viscosity', 0.0002, 0.05, 0.0002).name('Viscosity ν').onChange(onFlow);
+    f1.add(params, 'bubbleStrength', 0, 0.6, 0.01).name('Reverse flow / U');
+    f1.add(params, 'viscousBlend', 1.2, 6, 0.1).name('No-slip reach');
+
+    const f2 = gui.addFolder('Shedding');
+    f2.add(params, 'autoStrouhal').name('St from Re').onChange(onFlow);
+    f2.add(params, 'strouhal', 0, 0.35, 0.005).name('St override').onChange(onFlow);
+    f2.add(params, 'autoCirculation').name('Γ from Cd').onChange(onFlow);
+    f2.add(params, 'gammaRatio', 0.05, 2, 0.05).name('Γ/(UD) override').onChange(onFlow);
+    f2.add(params, 'autoSpread').name('Spread from Kármán').onChange(onFlow);
+    f2.add(params, 'spreadRatio', 0.02, 0.5, 0.01).name('h/λ override').onChange(onFlow);
+
+    const f3 = gui.addFolder('Filament shape');
+    f3.add(params, 'coreRatio', 0.05, 0.5, 0.01).name('σ₀/D').onChange(onFlow);
+    f3.add(params, 'eddyRatio', 1, 200, 1).name('Eddy viscosity νt/ν').onChange(onFlow);
+    f3.add(params, 'legSpanRatio', 0.1, 1.6, 0.05).name('Leg span / D');
+    f3.add(params, 'legLenRatio', 0.5, 6, 0.1).name('Leg length / D');
+    f3.add(params, 'precession', 0, 1.2, 0.02).name('Plane precession');
+
+    const f4 = gui.addFolder('Display');
+    f4.add(params, 'quality', Object.keys(QUALITY)).name('Tracer count').listen()
+      .onChange(v => buildParticles(QUALITY[v]));
+    f4.add(params, 'autoQuality').name('Hold 60 fps');
+    f4.add(params, 'seedMode', { 'Shear layer': 0, 'Mixed': 1, 'Upstream rake': 2 }).name('Seeding');
+    f4.add(params, 'tracerSpeed', 0.2, 3, 0.05).name('Tracer speed');
+    f4.add(params, 'stepCap', 8, 120, 1).name('Step limit');
+    f4.add(params, 'pointSize', 1, 6, 0.1).name('Particle size');
+    f4.add(params, 'exposure', 0.3, 2.5, 0.05).name('Exposure');
+    f4.add(params, 'bloom', 0, 1.5, 0.02).name('Glow').onChange(v => bloomPass.strength = v);
+    f4.add(params, 'palette', { 'Signed vorticity': 0, '|ω| magnitude': 1, 'Speed': 2 }).name('Colour by');
+
+    gui.add(params, 'reset').name('Reseed tracers');
+}
+
+function refreshPanel() {
+    const set = (id, v, cls) => {
+        const el = document.getElementById(id);
+        el.textContent = v;
+        el.className = 'num' + (cls ? ' ' + cls : '');
+    };
+    const shedding = derived.fs > 0;
+    set('r-re', Math.round(derived.Re).toLocaleString('en-US'));
+    set('r-regime', derived.regime, shedding ? '' : 'warn');
+    set('r-cd', derived.Cd.toFixed(3));
+    set('r-sep', derived.sepAngle.toFixed(0) + '°');
+    set('r-st', shedding ? derived.St.toFixed(3) : 'no shedding', shedding ? '' : 'warn');
+    set('r-fs', shedding ? derived.fs.toFixed(3) + ' Hz' : '—');
+    set('r-lam', shedding ? (derived.lambda / derived.D).toFixed(2) : '—');
+    set('r-gam', (derived.gamma / (params.uInf * derived.D)).toFixed(2));
+    set('r-lr', (derived.Lr / derived.D).toFixed(2));
+    set('r-nut', params.eddyRatio.toFixed(0));
+    set('r-sig', (derived.sigma0 / derived.D).toFixed(2) + ' → ' +
+                 (derived.sigmaOut / derived.D).toFixed(2));
+}
+
+function bindPointer() {
+    const dom = renderer.domElement;
+    const toNDC = e => pointerNDC.set(
+        (e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+
+    dom.addEventListener('pointerdown', e => {
+        if (activePointer !== null) return;
+        toNDC(e);
+        raycaster.setFromCamera(pointerNDC, camera);
+        if (raycaster.intersectObject(sphereMesh).length === 0) return;
+        activePointer = e.pointerId;
+        dom.setPointerCapture(e.pointerId);
+        dragging = true;
+        controls.enabled = false;
+        dom.style.cursor = 'grabbing';
+        dragPlane.setFromNormalAndCoplanarPoint(
+            camera.getWorldDirection(new THREE.Vector3()).negate(), sphereMesh.position);
+        if (raycaster.ray.intersectPlane(dragPlane, dragHit)) dragOffset.copy(dragHit).sub(sphereMesh.position);
+    });
+
+    dom.addEventListener('pointermove', e => {
+        if (!dragging || e.pointerId !== activePointer) return;
+        toNDC(e);
+        raycaster.setFromCamera(pointerNDC, camera);
+        if (!raycaster.ray.intersectPlane(dragPlane, dragHit)) return;
+        const target = dragHit.clone().sub(dragOffset);
+        obstacle.pos.set(
+            THREE.MathUtils.clamp(target.x, -36, 8),
+            THREE.MathUtils.clamp(target.y, -14, 14),
+            THREE.MathUtils.clamp(target.z, -14, 14));
+        sphereMesh.position.copy(obstacle.pos);
+        updateRings();
+    });
+
+    const release = e => {
+        if (e.pointerId !== activePointer) return;
+        dragging = false; activePointer = null;
+        controls.enabled = true;
+        dom.style.cursor = 'auto';
+    };
+    dom.addEventListener('pointerup', release);
+    dom.addEventListener('pointercancel', release);
+}
+
+function onResize() {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+    composer.setSize(innerWidth, innerHeight);
+}
+
+/* ===================================================================
+   LOOP
+   =================================================================== */
+
+const prevPos = new THREE.Vector3();
+
+function syncUniforms(dt) {
+    for (const m of [updateMat, renderMat]) {
+        const u = m.uniforms;
+        u.uSpherePos.value.copy(obstacle.pos);
+        u.uSphereVel.value.copy(obstacle.vel);
+        u.uSphereR.value = params.sphereRadius;
+        u.uUinf.value = params.uInf;
+        u.uTime.value = simTime;
+        u.uBlend.value = params.viscousBlend;
+        u.uCd.value = derived.Cd;
+        u.uLr.value = derived.Lr;
+        u.uBubble.value = params.bubbleStrength;
+        u.uGamma.value = derived.gamma;
+        u.uSigma0.value = derived.sigma0;
+        u.uSpread.value = derived.spread;
+        u.uLegSpan.value = params.legSpanRatio * derived.D;
+        u.uLegLen.value = params.legLenRatio * derived.D;
+        u.uNuT.value = derived.nuT;
+    }
+    updateMat.uniforms.uDt.value = dt;
+    updateMat.uniforms.uSpeedScale.value = params.tracerSpeed;
+    updateMat.uniforms.uStepCap.value = params.stepCap;
+    updateMat.uniforms.uSepAngle.value = derived.sepAngle;
+    updateMat.uniforms.uSeedMode.value = Number(params.seedMode);
+    renderMat.uniforms.uPointSize.value = params.pointSize;
+    renderMat.uniforms.uExposure.value = params.exposure;
+    renderMat.uniforms.uPalette.value = Number(params.palette);
+}
+
+function tuneQuality(ms, dt) {
+    if (!params.autoQuality) return;
+    msEMA += (ms - msEMA) * 0.06;
+    qualityCooldown -= dt;
+    if (qualityCooldown > 0) return;
+    const keys = Object.keys(QUALITY);
+    const idx = keys.indexOf(params.quality);
+    if (msEMA > 20 && idx > 0) {
+        params.quality = keys[idx - 1];
+        buildParticles(QUALITY[params.quality]);
+        qualityCooldown = 3; msEMA = 16;
+    } else if (msEMA < 11.5 && idx < keys.length - 1) {
+        params.quality = keys[idx + 1];
+        buildParticles(QUALITY[params.quality]);
+        qualityCooldown = 6; msEMA = 16;
+    }
+}
+
+function animate(stamp) {
+    requestAnimationFrame(animate);
+    stats.begin();
+
+    // Real frame time is the interval between callbacks. Timing around
+    // composer.render() only measures CPU submission, because WebGL is async,
+    // which is why the old readout sat at 0.0 ms.
+    const frameMs = lastFrameStamp ? Math.min(stamp - lastFrameStamp, 200) : 16.7;
+    lastFrameStamp = stamp;
+
+    const dt = Math.min(clock.getDelta(), 0.05);
+    simTime += dt;
+
+    obstacle.vel.subVectors(obstacle.pos, prevPos).divideScalar(Math.max(dt, 1e-4));
+    if (!dragging) obstacle.vel.multiplyScalar(0.85);
+    prevPos.copy(obstacle.pos);
+
+    updateShedding(simTime);
+    const { live, front } = retireFilaments(simTime);
+    syncUniforms(dt);
+
+    gpgpuQuad.material = updateMat;
+    updateMat.uniforms.uPositions.value = fboA.texture;
+    renderer.setRenderTarget(fboB);
+    renderer.render(gpgpuScene, gpgpuCam);
+    renderer.setRenderTarget(null);
+
+    const swap = fboA; fboA = fboB; fboB = swap;
+    renderMat.uniforms.uPositions.value = fboA.texture;
+
+    controls.update();
+    composer.render();
+
+    document.getElementById('r-fil').textContent = live + ' / ' + MAXFIL;
+    document.getElementById('r-front').textContent =
+        Math.max(0, (front - obstacle.pos.x) / derived.D).toFixed(1) + ' D';
+    const msEl = document.getElementById('r-ms');
+    msEl.textContent = frameMs.toFixed(1) + ' ms';
+    msEl.className = 'num' + (frameMs > 20 ? ' warn' : '');
+
+    tuneQuality(frameMs, dt);
+    stats.end();
+}
+
+if (init()) { prevPos.copy(obstacle.pos); requestAnimationFrame(animate); }
+</script>
+</body>
+</html>
